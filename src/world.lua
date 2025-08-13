@@ -1,7 +1,9 @@
 blocks = require("src.blocks")
 
-local VIEW_PADDING_CHUNKS = 2
+-- constants
+local VIEW_PADDING = 2
 
+-- WORLD CLASS
 local world = {
     data = {},
     lightmap = {},
@@ -17,29 +19,76 @@ function world:create_chunk(cx, cy)
     if self.data[key] then return self.data[key] end
 
     local chunk = {}
-    for x = 1, CW do
-        chunk[x] = {}
+    self.data[key] = chunk
 
-        local block_x = cx * CW + (x - 1)
-        local ground_height = math.floor(32 + (love.math.noise(block_x * 0.03) - 0.5) * 2 * 10)
+    for rel_x = 1, CW do
+        chunk[rel_x] = {}
+
+        local block_x = cx * CW + (rel_x - 1)
+        local ground_height = math.floor(32 + (love.math.noise(block_x * 0.04) - 0.6) * 2 * 15)
+        local dirt_height = ground_height + 16
+
         local name
 
-        for y = 1, CH do
-            local block_y = cy * CH + (y - 1)
+        for rel_y = 1, CH do
+            local block_y = cy * CH + (rel_y - 1)
 
-            if block_y == ground_height then
-                name = "soil_f"
-            elseif block_y > ground_height then
-                name = "dirt_f"
-            else
+            if block_y < ground_height then
                 name = "air"
+
+            elseif block_y >= ground_height then
+                local noise = love.math.noise(block_x * 0.05, block_y * 0.05)
+
+                if block_y <= dirt_height then
+                    if noise > 0.3 then
+                        if block_y == ground_height then
+                            name = "soil_f"
+                        
+                        elseif block_y == dirt_height then
+                            name = "dynamite"
+
+                        elseif block_y < dirt_height then
+                            name = "dirt_f"
+                        end
+                        
+                    else
+                        name = "air"
+                    end
+
+                else
+                    if noise > 0.5 then
+                        name = "stone"
+                    else
+                        name = "air"
+                    end
+                end
             end
 
-            chunk[x][y] = blocks.id[name]
+            self:set(key, rel_x, rel_y, name)
 
         end
     end
-    self.data[key] = chunk
+
+    chunk = self:modify_chunk(key)
+
+    return chunk
+end
+
+function world:set(key, block_x, block_y, name)
+    self.data[key][block_x][block_y] = blocks.id[name]
+end
+
+function world:modify_chunk(key)
+    local chunk = self.data[key]
+    for x = 1, CW do
+        for y = 1, CH do
+            local name = blocks.name[chunk[x][y]]
+            if name == "soil_f" then
+                -- self:set(key, x, y, "red-poppy")
+            end
+        end
+    end
+
     return chunk
 end
 
@@ -76,15 +125,15 @@ function world:break_(key, block_x, block_y)
 end
 
 function world:update(dt, scroll)
-    self:propagate_lighting(scroll)
+    -- self:propagate_lighting(scroll)
 end
 
 function world:propagate_lighting(scroll)
     -- Determine bounds
-    local min_x = math.floor(scroll.x / BS) - 2
-    local max_x = math.floor((scroll.x + WIDTH) / BS) + 2
-    local min_y = math.floor(scroll.y / BS) - 2
-    local max_y = math.floor((scroll.y + HEIGHT) / BS) + 2
+    local min_x = math.floor(scroll.x / BS) - VIEW_PADDING
+    local max_x = math.floor((scroll.x + WIDTH) / BS) + VIEW_PADDING
+    local min_y = math.floor(scroll.y / BS) - VIEW_PADDING
+    local max_y = math.floor((scroll.y + HEIGHT) / BS) + VIEW_PADDING
 
     -- Reset lightmap
     self.lightmap = {}
@@ -116,10 +165,10 @@ function world:propagate_lighting(scroll)
         local n = {
             {x + 1, y}, {x - 1, y}, {x, y + 1}, {x, y - 1}
         }
-        for i = 1,4 do
+        for i = 1, 4 do
             local nx, ny = n[i][1], n[i][2]
             if self.lightmap[ny] and self.lightmap[ny][nx] ~= nil then
-                local decay = 1 / 15
+                local decay = 1.4 / 15
                 local pass_lv = lv - decay
                 if pass_lv > (self.lightmap[ny][nx] or 0) and pass_lv > 0 then
                     self.lightmap[ny][nx] = pass_lv
@@ -152,7 +201,7 @@ function world:draw(scroll)
                 love.graphics.draw(blocks.sprs, blocks.quads[tile], tx * BS, ty * BS, 0, S, S)
                 love.graphics.setColor(0, 0, 0, 1 - l)
             end
-            love.graphics.rectangle("fill", tx * BS, ty * BS, BS, BS)
+            -- love.graphics.rectangle("fill", tx * BS, ty * BS, BS, BS)
             love.graphics.setColor(1, 1, 1, 1)
         end
     end

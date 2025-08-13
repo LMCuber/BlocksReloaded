@@ -28,7 +28,7 @@ function Player:new(world)
         world = world,
         x = 0,
         y = 0,
-        speed = 340,
+        speed = 500,
         mouse_down,
         block_action = BlockAction.NONE,
     }
@@ -58,16 +58,16 @@ function Player:interact(scroll)
 end
 
 function Player:move(dt)
-    if love.keyboard.isDown('w') then
+    if love.keyboard.isDown("w") then
         self.y = self.y - self.speed * dt
     end
-    if love.keyboard.isDown('s') then
+    if love.keyboard.isDown("s") then
         self.y = self.y + self.speed * dt
     end
-    if love.keyboard.isDown('a') then
+    if love.keyboard.isDown("a") then
         self.x = self.x - self.speed * dt
     end
-    if love.keyboard.isDown('d') then
+    if love.keyboard.isDown("d") then
         self.x = self.x + self.speed * dt
     end
 end

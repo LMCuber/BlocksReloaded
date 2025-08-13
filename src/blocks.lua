@@ -24,29 +24,31 @@ local block_list = {
 blocks = {
     sprs = love.graphics.newImage("res/blocks.png"),
     quads = {},
-    id = {
-        air = 0,
-        soil_f = 1,
-        dirt_f = 2,
-        stone = 3,
-    }
+    id = {},
+    name = {},
 }
 blocks.sprs:setFilter("nearest", "nearest")
 
+local id = 0
 for y, layer in ipairs(block_list) do
     for x, name in ipairs(layer) do
-        local id = blocks.id[name]
-        if id then
-            blocks.quads[id] = love.graphics.newQuad(
-                (x - 1) * BPS,
-                (y - 1) * BPS,
-                BPS,
-                BPS,
-                blocks.sprs:getWidth(),
-                blocks.sprs:getHeight()
-            )
-        end
+        -- save the quad
+        blocks.quads[id] = love.graphics.newQuad(
+            (x - 1) * BPS,
+            (y - 1) * BPS,
+            BPS,
+            BPS,
+            blocks.sprs:getWidth(),
+            blocks.sprs:getHeight()
+        )
+        -- save the id link just created
+        blocks.id[name] = id
+        id = id + 1
     end
+end
+-- also create name -> id (we already have id -> name)
+for name, id in pairs(blocks.id) do
+    blocks.name[id] = name
 end
 
 return blocks
