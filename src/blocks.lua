@@ -21,6 +21,7 @@ local block_list = {
     {"corn-crop_vr0.0", "corn-crop_vr1.0",  "corn-crop_vr2.0", "corn-crop_vr3.0", "corn-crop_vr4.0", "cattail",          "pampas",      "",            "",             "",            "",            "pillar_vr0"},
 }
 
+local sprs_data = love.image.newImageData("res/blocks.png")
 blocks = {
     sprs = love.graphics.newImage("res/blocks.png"),
     quads = {},
@@ -33,7 +34,7 @@ local id = 0
 for y, layer in ipairs(block_list) do
     for x, name in ipairs(layer) do
         -- save the quad
-        blocks.quads[id] = love.graphics.newQuad(
+        local quad = love.graphics.newQuad(
             (x - 1) * BPS,
             (y - 1) * BPS,
             BPS,
@@ -41,6 +42,8 @@ for y, layer in ipairs(block_list) do
             blocks.sprs:getWidth(),
             blocks.sprs:getHeight()
         )
+        blocks.quads[id] = quad
+
         -- save the id link just created
         blocks.id[name] = id
         id = id + 1

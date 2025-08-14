@@ -28,7 +28,7 @@ function Player:new(world)
         world = world,
         x = 0,
         y = 0,
-        speed = 500,
+        speed = 1000,
         mouse_down,
         block_action = BlockAction.NONE,
     }

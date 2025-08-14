@@ -8,7 +8,6 @@ local fake_scroll = { x = 0, y = 0 }
 local scroll = { x = 0, y = 0 }
 
 -- functions
-local m = 0.1
 function apply_scroll()
     fake_scroll.x = fake_scroll.x + (player.x - fake_scroll.x - WIDTH / 2 + 15)
     fake_scroll.y = fake_scroll.y + (player.y - fake_scroll.y - HEIGHT / 2 + 15)
@@ -18,7 +17,7 @@ end
 
 -- love load
 function love.load()
-    love.graphics.setBackgroundColor(0.2, 0.2, 0.2, 1)
+    love.graphics.setBackgroundColor(1, 1, 1, 0)
     player.y = BS * (CH * 2)
 end
 
@@ -32,9 +31,9 @@ end
 -- love draw
 function love.draw()
     love.graphics.push()
-    love.graphics.translate(-scroll.x, -scroll.y)
 
-    love.graphics.setColor(1, 1, 1, 1)
+    love.window.setTitle("Blockingdom | " .. love.timer.getFPS() .. " FPS")
+    love.graphics.translate(-scroll.x, -scroll.y)
 
     world:draw(scroll)
     player:draw(scroll)
@@ -43,6 +42,6 @@ function love.draw()
     love.graphics.pop()
 
     -- FPS
-    love.graphics.setColor(1, 1, 1)
-    love.graphics.print("FPS: " .. tostring(love.timer.getFPS()), 10, 10)
+    -- love.graphics.setColor(1, 1, 1)
+    -- love.graphics.print("FPS: " .. love.timer.getFPS(), 10, 10)
 end
