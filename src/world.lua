@@ -1,23 +1,13 @@
 blocks = require("src.blocks")
 biomes = require("src.biome")
+ecs = require("src.ecs")
+ent = require("src.entities")
+Vec2 = require("src.Vec2")
+systems = require("src.systems")
 
 -- constants
 local VIEW_PADDING = 2
-local MAX_LIGHT = 15
-
--- WORLD CLASS
-local world = {
-    data = {},
-    lightmap = {},
-    batch = love.graphics.newSpriteBatch(blocks.sprs, 1000),
-    lighting = true,
-    biome = biomes.Forest,
-    x_seed = love.math.random(),
-    y_seed = love.math.random(),
-}
--- seed the RNG
-love.math.setRandomSeed(world.x_seed)
-print(world.x_seed, world.y_seed)
+local MAX_LIGHT = 10
 
 -- love event handlers
 function love.keypressed(key, scancode, isrepeat)
@@ -26,17 +16,37 @@ function love.keypressed(key, scancode, isrepeat)
     end
 end
 
-function world:key(cx, cy)
+-- WORLD CLASS
+World = {}
+World.__index = World
+
+function World:new()
+    local obj = setmetatable({}, self)
+
+    obj.data = {}
+    obj.lightmap = {}
+    obj.light_surf = nil
+    obj.batch = love.graphics.newSpriteBatch(blocks.sprs, 1000)
+    obj.lighting = true
+    obj.biome = biomes.Forest
+    obj.x_seed = love.math.random()
+    obj.y_seed = love.math.random()
+    love.math.setRandomSeed(obj.x_seed)
+
+    return obj
+end
+
+function World:key(cx, cy)
     return cx .. "," .. cy
 end
 
-function world:parse_key(key)
+function World:parse_key(key)
     local cx, cy = key:match("(%d+),(%d+)")
     return tonumber(cx), tonumber(cy)
 end
 
 
-function world:octave_noise(args)
+function World:octave_noise(args)
     args = args or {}
 
     local x = args.x
@@ -62,7 +72,7 @@ function world:octave_noise(args)
     return noise / max_value
 end
 
-function world:create_chunk(cx, cy)
+function World:create_chunk(cx, cy)
     -- initialize chunk metadata
     local key = self:key(cx, cy)
     local chunk = {}
@@ -77,7 +87,7 @@ function world:create_chunk(cx, cy)
 
         -- get terrain height for this column from noise
         local block_x = cx * CW + (rel_x - 1)
-        local ground_height = math.floor(32 + (world:octave_noise({
+        local ground_height = math.floor(32 + (self:octave_noise({
             x = block_x,
             y = 1,
             freq = biome.freq
@@ -103,7 +113,7 @@ function world:create_chunk(cx, cy)
                 })
 
                 if block_y <= dirt_height then
-                    if noise > 0.3 then
+                    if noise > 0 then
                         if block_y == ground_height then
                             name = biome.top
                         
@@ -134,7 +144,7 @@ function world:create_chunk(cx, cy)
     return chunk
 end
 
-function world:set(key, rel_x, rel_y, name)
+function World:set(key, rel_x, rel_y, name)
     -- Parse the current chunk key
     local cx, cy = key:match("(-?%d+),(-?%d+)")
     cx, cy = tonumber(cx), tonumber(cy)
@@ -170,10 +180,7 @@ function world:set(key, rel_x, rel_y, name)
     self.data[nkey][nx][ny] = blocks.id[name]
 end
 
-
--- function world:offset(key, )
-
-function world:modify_chunk(key)
+function World:modify_chunk(key)
     local function chance(n)
         return love.math.random() <= n
     end
@@ -183,11 +190,19 @@ function world:modify_chunk(key)
         for y = 1, CH do
             local name = blocks.name[chunk[x][y]]
 
-
-
             if name == "soil_f" then
+                -- flowers
+                local flower = ""
                 if chance(1 / 10) then
-                    self:set(key, x, y - 1, "red-poppy")
+                    local c = love.math.random()
+                    if c <= 0.7 then
+                        flower = "red-poppy"
+                    elseif c <= 0.4 then
+                        flower = "yellow-poppy"
+                    else
+                        flower = "orchid"
+                    end
+                    self:set(key, x, y - 1, flower)
                 end
             end
 
@@ -197,7 +212,7 @@ function world:modify_chunk(key)
     return chunk
 end
 
-function world:get_tile(block_x, block_y)
+function World:get_tile(block_x, block_y)
     local chunk_x = math.floor(block_x / CW)
     local chunk_y = math.floor(block_y / CH)
     local key = self:key(chunk_x, chunk_y)
@@ -210,7 +225,7 @@ function world:get_tile(block_x, block_y)
     return (chunk[rel_x] and chunk[rel_x][rel_y]) or 0
 end
 
-function world:mouse_to_block(mx, my, scroll)
+function World:mouse_to_block(mx, my, scroll)
     local block_x = math.floor((mx + scroll.x) / BS)
     local block_y = math.floor((my + scroll.y) / BS)
 
@@ -225,24 +240,24 @@ function world:mouse_to_block(mx, my, scroll)
     return key, rel_x, rel_y
 end
 
-function world:break_(key, block_x, block_y)
-    self.data[key][block_x][block_y] = blocks.id["air"]
+function World:break_(key, block_x, block_y)
+    self.data[key][block_x][block_y] = blocks.id["torch"]
 end
 
-function world:update(dt, scroll)
+function World:update(dt, scroll)
     if self.lighting then
         self:propagate_lighting(scroll)
     end
 end
 
-function world:propagate_lighting(scroll)
-    -- Determine bounds
+function World:propagate_lighting(scroll)
+    -- determine bounds
     local min_x = math.floor(scroll.x / BS) - VIEW_PADDING
     local max_x = math.floor((scroll.x + WIDTH) / BS) + VIEW_PADDING
     local min_y = math.floor(scroll.y / BS) - VIEW_PADDING
     local max_y = math.floor((scroll.y + HEIGHT) / BS) + VIEW_PADDING
 
-    -- Reset lightmap
+    -- reset lightmap and light surface
     self.lightmap = {}
     for ty = min_y, max_y do
         self.lightmap[ty] = {}
@@ -255,7 +270,8 @@ function world:propagate_lighting(scroll)
     -- Init air tiles
     for ty = min_y, max_y do
         for tx = min_x, max_x do
-            if self:get_tile(tx, ty) == 0 then
+            local name = blocks.name[self:get_tile(tx, ty)]
+            if bwand(name, BF.LIGHT_SOURCE) then
                 self.lightmap[ty][tx] = MAX_LIGHT
                 tail = tail + 1
                 qx[tail], qy[tail], ql[tail] = tx, ty, MAX_LIGHT
@@ -287,11 +303,21 @@ function world:propagate_lighting(scroll)
     end
 end
 
-function world:draw(scroll)
+function World:draw(scroll)
+    -- B L O C K S
     local min_x = math.floor(scroll.x / BS)
     local max_x = math.floor((scroll.x + WIDTH) / BS)
     local min_y = math.floor(scroll.y / BS)
     local max_y = math.floor((scroll.y + HEIGHT) / BS)
+    local size_x = max_x - min_x + 1
+    local size_y = max_y - min_y + 1
+    local lighting_offset = {x = 0, y = 0}
+
+    -- clear the image batch and light surface
+    self.batch:clear()
+    if self.lighting then
+        self.light_surf = love.image.newImageData(size_x, size_y)
+    end
 
     for ty = min_y, max_y do
         for tx = min_x, max_x do
@@ -303,16 +329,45 @@ function world:draw(scroll)
                 local base = 0.36
                 light = math.min(light + 1, MAX_LIGHT)
                 local l = light / MAX_LIGHT
-                love.graphics.draw(blocks.sprs, blocks.quads[tile], tx * BS, ty * BS, 0, S, S)
-                love.graphics.setColor(0, 0, 0, 1 - l)
+                self.batch:add(blocks.quads[tile], tx * BS, ty * BS, 0, S, S)
+                if self.lighting then
+                    self.light_surf:setPixel(
+                        tx - min_x, ty - min_y,
+                        0, 0, 0, 1 - l
+                    )
+                end
             end
 
-            if self.lighting then
-                love.graphics.rectangle("fill", tx * BS, ty * BS, BS, BS)
+            if tx == min_x and ty == min_y then
+                lighting_offset.x = tx * BS - scroll.x
+                lighting_offset.y = ty * BS - scroll.y
             end
+
             love.graphics.setColor(1, 1, 1, 1)
         end
     end
+
+    -- B L O C K  L I G H T I N G
+    love.graphics.draw(self.batch)
+
+    if self.lighting then
+        self.light_surf = love.graphics.newImage(self.light_surf)
+        -- self.light_surf:setFilter("nearest", "nearest")
+        love.graphics.draw(self.light_surf, scroll.x + lighting_offset.x, scroll.y + lighting_offset.y, 0, BS, BS)
+    end
+
+    -- E N T I T I E S
+    systems.render:process()
 end
+
+local world = World:new()
+
+ecs:create_entity(
+    "0,0",
+    ent.Transform:new(
+        Vec2:new(0, 0),
+        Vec2:new(0, 0)
+    )
+)
 
 return world

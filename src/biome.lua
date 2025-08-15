@@ -2,7 +2,7 @@ biomes = {
     Forest = {
         top = "soil_f",
         dirt = "dirt_f",
-        freq = 0.04,
+        freq = 0.015,
     },
     
     Beach = {

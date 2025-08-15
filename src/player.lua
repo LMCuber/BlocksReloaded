@@ -1,6 +1,3 @@
-local Player = {}
-Player.__index = Player
-
 -- constants
 BlockAction = {
     PLACE = 0,
@@ -23,6 +20,9 @@ function love.mousereleased(mouse_x, mouse_y, button)
 end
 
 -- player class
+local Player = {}
+Player.__index = Player
+
 function Player:new(world)
     local obj = {
         world = world,

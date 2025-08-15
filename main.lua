@@ -1,6 +1,7 @@
 blocks = require("src.blocks")
 world = require("src.world")
 player = require("src.player")
+fonts = require("src.fonts")
 
 player.world = world
 
@@ -32,16 +33,17 @@ end
 function love.draw()
     love.graphics.push()
 
-    love.window.setTitle("Blockingdom | " .. love.timer.getFPS() .. " FPS")
     love.graphics.translate(-scroll.x, -scroll.y)
 
+    -- update the components
     world:draw(scroll)
     player:draw(scroll)
 
-    -- Player
     love.graphics.pop()
 
     -- FPS
-    -- love.graphics.setColor(1, 1, 1)
-    -- love.graphics.print("FPS: " .. love.timer.getFPS(), 10, 10)
+    love.graphics.setColor(0, 0, 0, 1)
+    love.graphics.setFont(fonts.orbitron[24])
+    love.graphics.print("FPS: " .. love.timer.getFPS(), 10, 10)
+    love.graphics.setColor(1, 1, 1, 1)
 end
