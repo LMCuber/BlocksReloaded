@@ -40,4 +40,28 @@ function commons.extend(t1, t2)
     end
 end
 
+function commons.split(str, sep)
+    local first, rest = str:match("([^" .. sep .. "]+)" .. sep .. "(.+)")
+    if not first then
+        -- no separator found, return string and empty table
+        return str, {}
+    end
+    
+    local result = {}
+    for part in string.gmatch(rest, "([^" .. sep .. "]+)") do
+        table.insert(result, part)
+    end
+    
+    return first, result
+end
+
+function commons.contains(tbl, element)
+    for _, value in ipairs(tbl) do
+        if value == element then
+            return true
+        end
+    end
+    return false
+end
+
 return commons

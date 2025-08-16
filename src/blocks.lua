@@ -1,4 +1,5 @@
 bit = require("bit")
+commons = require("src.commons")
 
 -- constants
 _G.CW = 16
@@ -10,19 +11,29 @@ _G.WIDTH, _G.HEIGHT = love.graphics.getDimensions()
 
 -- block flags
 _G.BF = {
-    NONE = 0,
-    LIGHT_SOURCE = 1,
+    NONE         =     0,
+    LIGHT_SOURCE = 2 ^ 0,
+    ORE          = 2 ^ 1,
 }
 
 flags = {
     air = BF.LIGHT_SOURCE,
     torch = BF.LIGHT_SOURCE,
+    ["base-ore"] = BF.ORE,
 }
 
 function _G.bwand(name, flag)
     return bit.band(flags[name] or 0, flag) ~= 0
 end
 
+function _G.nbwand(name, flag)
+    return bit.band(flags[name] or 0, flag) == 0
+end
+
+function _G.norm(name)
+    base, mods = commons.split(name, "|")
+    return base, mods
+end
 
 -- block image loading
 local block_list = {
@@ -67,6 +78,12 @@ for y, layer in ipairs(block_list) do
         -- save the id link just created
         blocks.id[name] = id
         blocks.name[id] = name
+
+        -- save the backgrounded block id as well
+        id = id + 1
+        blocks.id[name .. "|b"] = id
+        blocks.name[id] = name .. "|b"
+
         id = id + 1
     end
 end

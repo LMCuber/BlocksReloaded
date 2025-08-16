@@ -51,7 +51,7 @@ function Player:interact(scroll)
     if self.mouse_down then
         if self.block_action == BlockAction.BREAK then
             local mx, my = love.mouse.getPosition()
-            local key, block_x, block_y = self.world:mouse_to_block(mx, my, scroll)
+        local key, block_x, block_y = self.world:mouse_to_block(mx, my, scroll)
             self.world:break_(key, block_x, block_y)
         end
     end

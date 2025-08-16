@@ -4,10 +4,11 @@ ecs = require("src.ecs")
 ent = require("src.entities")
 Vec2 = require("src.Vec2")
 systems = require("src.systems")
+fonts = require("src.fonts")
 
 -- constants
 local VIEW_PADDING = 2
-local MAX_LIGHT = 10
+local MAX_LIGHT = 12
 
 -- love event handlers
 function love.keypressed(key, scancode, isrepeat)
@@ -27,6 +28,7 @@ function World:new()
     obj.lightmap = {}
     obj.light_surf = nil
     obj.batch = love.graphics.newSpriteBatch(blocks.sprs, 1000)
+    obj.bg_batch = love.graphics.newSpriteBatch(blocks.sprs, 1000)
     obj.lighting = true
     obj.biome = biomes.Forest
     obj.x_seed = love.math.random()
@@ -91,8 +93,8 @@ function World:create_chunk(cx, cy)
             x = block_x,
             y = 1,
             freq = biome.freq
-        }) - 0.6) * 2 * 15)
-        local dirt_height = ground_height + 24
+        }) - 0.5) * 32)
+        local dirt_height = ground_height + 16
 
         local name
 
@@ -113,23 +115,17 @@ function World:create_chunk(cx, cy)
                 })
 
                 if block_y <= dirt_height then
-                    if noise > 0 then
-                        if block_y == ground_height then
-                            name = biome.top
-                        
-                        elseif block_y < dirt_height then
-                            name = biome.dirt
-                        end
-                        
-                    else
-                        name = "air"
+                    if block_y == ground_height then
+                        name = biome.top
+                    else 
+                        name = biome.dirt
                     end
 
                 else
                     if noise > 0.45 then
-                        name = "stone"
+                        name = self:get_ore()
                     else
-                        name = "air"
+                        name = "stone|b"
                     end
                 end
             end
@@ -144,7 +140,25 @@ function World:create_chunk(cx, cy)
     return chunk
 end
 
-function World:set(key, rel_x, rel_y, name)
+function World:get_ore()
+    local r = love.math.random()
+    if r <= 0.02 then
+        return "base-ore"
+    end
+    return "stone"
+end
+
+function World:get(key, rel_x, rel_y)
+    if self.data[key] and self.data[key][rel_x] and self.data[key][rel_x][rel_y] then
+        return self.data[key][rel_x][rel_y]
+    end
+    return nil
+end
+
+function World:set(key, rel_x, rel_y, name, safe)
+    -- safe means doesn't create new chunks if it overflows
+    safe = safe or false
+
     -- Parse the current chunk key
     local cx, cy = key:match("(-?%d+),(-?%d+)")
     cx, cy = tonumber(cx), tonumber(cy)
@@ -152,29 +166,36 @@ function World:set(key, rel_x, rel_y, name)
     local nx, ny = rel_x, rel_y
     local nkey = key
 
-    -- Check horizontal bounds
-    if nx < 1 then
-        cx = cx - 1
-        nx = CW + nx
-    elseif nx > CW then
-        cx = cx + 1
-        nx = nx - CW
+    -- check horizontal bounds
+    if nx < 1 or nx > CW then
+        if safe then
+            return
+        end
+        -- compute how many chunks we need to move
+        local chunk_offset = math.floor((nx - 1) / CW)
+        cx = cx + chunk_offset
+        -- wrap nx back into 1..CW
+        nx = nx - chunk_offset * CW
     end
 
-    -- Check vertical bounds
-    if ny < 1 then
-        cy = cy - 1
-        ny = CH + ny
-    elseif ny > CH then
-        cy = cy + 1
-        ny = ny - CH
+    -- check vertical bounds
+    if ny < 1 or ny > CH then
+        if safe then
+            return
+        end
+        -- compute how many chunks we need to move
+        local chunk_offset = math.floor((ny - 1) / CH)
+        cy = cy + chunk_offset
+        -- wrap nx back into 1..CW
+        ny = ny - chunk_offset * CH
     end
 
     nkey = cx .. "," .. cy
 
     -- Ensure the tables exist
-    self.data[nkey] = self.data[nkey] or {}
-    self.data[nkey][nx] = self.data[nkey][nx] or {}
+    if not self.data[nkey] then
+        self:create_chunk(cx, cy)
+    end
 
     -- Assign the block
     self.data[nkey][nx][ny] = blocks.id[name]
@@ -190,22 +211,84 @@ function World:modify_chunk(key)
         for y = 1, CH do
             local name = blocks.name[chunk[x][y]]
 
+            -- F O R E S T
             if name == "soil_f" then
                 -- flowers
                 local flower = ""
                 if chance(1 / 10) then
                     local c = love.math.random()
-                    if c <= 0.7 then
+                    if c >= 0.7 then
                         flower = "red-poppy"
-                    elseif c <= 0.4 then
+                    elseif c >= 0.4 then
                         flower = "yellow-poppy"
                     else
                         flower = "orchid"
                     end
                     self:set(key, x, y - 1, flower)
                 end
+                
+                -- tree
+                if chance(1 / 15) then
+                    local tree_height = love.math.random(4, 16)
+                    for yo = 1, tree_height do
+                        if yo == tree_height then
+                            self:set(key, x, y - yo, "wood_f_vrLRT")
+                            self:set(key, x, y - yo - 1, "leaf_f")
+                        else
+                            self:set(key, x, y - yo, "wood_f_vrN")
+                        end
+
+                        if chance(1 / 4) or yo == tree_height then
+                            self:set(key, x, y - yo, "wood_f_vrR")
+                            self:set(key, x + 1, y - yo, "leaf_f")
+                        elseif chance(1 / 4) or yo == tree_height then
+                            self:set(key, x, y - yo, "wood_f_vrL")
+                            self:set(key, x - 1, y - yo, "leaf_f")
+                        end
+                    end
+                end
+
+                -- pyramid
+                if chance(1 / 40) then
+                    local pyr_height = love.math.random(6, 20)
+                    local pyr_offset = love.math.random(1, pyr_height / 4)
+                    for yo = 0, pyr_height do
+                        for xo = -yo, yo do
+                            if xo == -yo or xo == yo or yo == pyr_height then
+                                -- borders of the pyramid
+                                self:set(key, x + xo, y - pyr_offset + yo, "sand")
+                            else
+                                -- inside of the pyramid
+                                self:set(key, x + xo, y - pyr_offset + yo, "sand|b")
+                            end
+                            -- hidden chest!
+                            if yo == pyr_height - 1 and xo == 0 then
+                                self:set(key, x + xo, y - pyr_offset + yo, "chest")
+                            end
+                        end
+                    end
+                end
             end
 
+            -- populate the ore veins (lmao same comment)
+            if bwand(name, BF.ORE)
+                    and self:get(key, x + 1, y) ~= nil and nbwand(blocks.name[self:get(key, x + 1, y)], BF.ORE)
+                    and self:get(key, x - 1, y) ~= nil and nbwand(blocks.name[self:get(key, x - 1, y)], BF.ORE)
+                    and self:get(key, x, y + 1) ~= nil and nbwand(blocks.name[self:get(key, x, y + 1)], BF.ORE)
+                    and self:get(key, x, y - 1) ~= nil and nbwand(blocks.name[self:get(key, x, y - 1)], BF.ORE) then
+                -- simple 2D brownian motion
+                local num_walks = love.math.random(3, 7)
+                local walk_x = x
+                local walk_y = y
+                for _ = 1, num_walks do
+                    self:set(key, walk_x, walk_y, "base-ore", true)
+                    r = love.math.random(1, 4)
+                    if r == 1 then walk_x = walk_x + 1 end
+                    if r == 2 then walk_x = walk_x - 1 end
+                    if r == 3 then walk_y = walk_y + 1 end
+                    if r == 4 then walk_y = walk_y - 1 end
+                end
+            end
         end
     end
 
@@ -315,27 +398,41 @@ function World:draw(scroll)
 
     -- clear the image batch and light surface
     self.batch:clear()
+    self.bg_batch:clear()
     if self.lighting then
         self.light_surf = love.image.newImageData(size_x, size_y)
     end
+    local prints = {}
 
     for ty = min_y, max_y do
         for tx = min_x, max_x do
             local tile = self:get_tile(tx, ty)
+            local name = blocks.name[tile]
             local light = (self.lightmap[ty] and self.lightmap[ty][tx]) or 0
 
-            if tile ~= blocks.id["air"] then
+            if name ~= "air" then
                 -- normal tile
                 local base = 0.36
-                light = math.min(light + 1, MAX_LIGHT)
+                -- light = math.min(light + 1, MAX_LIGHT)
                 local l = light / MAX_LIGHT
-                self.batch:add(blocks.quads[tile], tx * BS, ty * BS, 0, S, S)
+
+                -- check if it's bg block to add to correct batch
+                base, mods = norm(name)
+
+                if commons.contains(mods, "b") then
+                    self.bg_batch:add(blocks.quads[blocks.id[base]], tx * BS, ty * BS, 0, S, S)
+                else
+                    self.batch:add(blocks.quads[tile], tx * BS, ty * BS, 0, S, S)
+                end
+
+                -- add lighting to the mix
                 if self.lighting then
                     self.light_surf:setPixel(
                         tx - min_x, ty - min_y,
                         0, 0, 0, 1 - l
                     )
                 end
+                -- table.insert(prints, {light or 0, tx * BS, ty * BS})
             end
 
             if tx == min_x and ty == min_y then
@@ -349,6 +446,17 @@ function World:draw(scroll)
 
     -- B L O C K  L I G H T I N G
     love.graphics.draw(self.batch)
+    local darkness = 0.5
+    love.graphics.setColor(darkness, darkness, darkness, 1)
+    love.graphics.draw(self.bg_batch)
+    love.graphics.setColor(1, 1, 1, 1)
+
+    -- debugging
+    love.graphics.setColor(1, 0.8, 0.75, 1)
+    love.graphics.setFont(fonts.orbitron[12])
+    for _, x in ipairs(prints) do
+        love.graphics.print(x[1], x[2], x[3])
+    end
 
     if self.lighting then
         self.light_surf = love.graphics.newImage(self.light_surf)

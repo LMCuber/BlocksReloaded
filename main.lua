@@ -42,8 +42,11 @@ function love.draw()
     love.graphics.pop()
 
     -- FPS
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.rectangle("fill", 0, 0, 136, 40)
     love.graphics.setColor(0, 0, 0, 1)
     love.graphics.setFont(fonts.orbitron[24])
-    love.graphics.print("FPS: " .. love.timer.getFPS(), 10, 10)
+    love.graphics.setColor(0, 0, 0, 1)
+    love.graphics.print("FPS: " .. love.timer.getFPS(), 6, 6)
     love.graphics.setColor(1, 1, 1, 1)
 end
