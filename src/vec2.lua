@@ -78,7 +78,7 @@ function Vec2.__unm(a)
 end
 
 function Vec2.__tostring(v)
-    return "(" .. v.x .. ", " .. v.y .. ")"
+    return "Vec2(" .. v.x .. ", " .. v.y .. ")"
 end
 
 return Vec2

@@ -33,6 +33,7 @@ function World:new()
     obj.biome = biomes.Forest
     obj.x_seed = love.math.random()
     obj.y_seed = love.math.random()
+    obj.processed_chunks = {}
     love.math.setRandomSeed(obj.x_seed)
 
     return obj
@@ -63,7 +64,7 @@ function World:octave_noise(args)
 
     local amp = 1
 
-    for i = 1, octaves do
+    for _ = 1, octaves do
         noise = noise + amp * love.math.noise(x * freq + self.x_seed, y * freq + self.y_seed)
         max_value = max_value + amp
 
@@ -206,10 +207,14 @@ function World:modify_chunk(key)
         return love.math.random() <= n
     end
 
+    local chunk_x, chunk_y = self:parse_key(key)
     local chunk = self.data[key]
+
     for x = 1, CW do
         for y = 1, CH do
             local name = blocks.name[chunk[x][y]]
+            local abs_x = chunk_x * CW + x
+            local abs_y = chunk_y * CH + y
 
             -- F O R E S T
             if name == "soil_f" then
@@ -249,7 +254,7 @@ function World:modify_chunk(key)
                 end
 
                 -- pyramid
-                if chance(1 / 40) then
+                if chance(1 / 100) then
                     local pyr_height = love.math.random(6, 20)
                     local pyr_offset = love.math.random(1, pyr_height / 4)
                     for yo = 0, pyr_height do
@@ -267,6 +272,18 @@ function World:modify_chunk(key)
                             end
                         end
                     end
+                end
+
+                -- entities
+                if chance(1 / 10) then
+                    ecs:create_entity(
+                        key,
+                        ent.Transform:new(
+                            Vec2:new(abs_x * BS, abs_y * BS),
+                            Vec2:new(0, 0)
+                        ),
+                        ent.Sprite:from_path("res/images/spritesheets/blocks.png")
+                    )
                 end
             end
 
@@ -293,6 +310,12 @@ function World:modify_chunk(key)
     end
 
     return chunk
+end
+
+function World:get_tile_key(block_x, block_y)
+    local chunk_x = math.floor(block_x / CW)
+    local chunk_y = math.floor(block_y / CH)
+    return Vec2:new(chunk_x, chunk_y)
 end
 
 function World:get_tile(block_x, block_y)
@@ -331,6 +354,7 @@ function World:update(dt, scroll)
     if self.lighting then
         self:propagate_lighting(scroll)
     end
+    return self.processed_chunks
 end
 
 function World:propagate_lighting(scroll)
@@ -339,6 +363,10 @@ function World:propagate_lighting(scroll)
     local max_x = math.floor((scroll.x + WIDTH) / BS) + VIEW_PADDING
     local min_y = math.floor(scroll.y / BS) - VIEW_PADDING
     local max_y = math.floor((scroll.y + HEIGHT) / BS) + VIEW_PADDING
+
+    -- empty processed chunks
+    self.processed_chunks = {}
+    local chunk_topleft, chunk_bottomright
 
     -- reset lightmap and light surface
     self.lightmap = {}
@@ -350,9 +378,10 @@ function World:propagate_lighting(scroll)
     local qx, qy, ql = {}, {}, {}
     local head, tail = 1, 0
 
-    -- Init air tiles
+    -- init air tiles
     for ty = min_y, max_y do
         for tx = min_x, max_x do
+            -- lighting stuff
             local name = blocks.name[self:get_tile(tx, ty)]
             if bwand(name, BF.LIGHT_SOURCE) then
                 self.lightmap[ty][tx] = MAX_LIGHT
@@ -361,6 +390,21 @@ function World:propagate_lighting(scroll)
             else
                 self.lightmap[ty][tx] = 0
             end
+
+            -- save the topleft and bottomright chunks
+            if tx == min_x and ty == min_y then
+                chunk_topleft = self:get_tile_key(tx, ty)
+            elseif tx == max_x and ty == max_y then
+                chunk_bottomright = self:get_tile_key(tx, ty)
+            end
+
+        end
+    end
+    
+    -- from the topleft and topright chunks, get intermediate chunks
+    for y = chunk_topleft.y, chunk_bottomright.y do
+        for x = chunk_topleft.x, chunk_bottomright.x do
+            table.insert(self.processed_chunks, self:key(x, y))
         end
     end
 
@@ -384,6 +428,9 @@ function World:propagate_lighting(scroll)
             end
         end
     end
+
+    -- return the processed chunks
+    return self.processed_chunks
 end
 
 function World:draw(scroll)
@@ -394,7 +441,7 @@ function World:draw(scroll)
     local max_y = math.floor((scroll.y + HEIGHT) / BS)
     local size_x = max_x - min_x + 1
     local size_y = max_y - min_y + 1
-    local lighting_offset = {x = 0, y = 0}
+    local lighting_offset = Vec2:new(0, 0)
 
     -- clear the image batch and light surface
     self.batch:clear()
@@ -435,6 +482,7 @@ function World:draw(scroll)
                 -- table.insert(prints, {light or 0, tx * BS, ty * BS})
             end
 
+            -- calculate the lighting offset
             if tx == min_x and ty == min_y then
                 lighting_offset.x = tx * BS - scroll.x
                 lighting_offset.y = ty * BS - scroll.y
@@ -465,17 +513,9 @@ function World:draw(scroll)
     end
 
     -- E N T I T I E S
-    systems.render:process()
+    systems.render:process(self.processed_chunks)
 end
 
 local world = World:new()
-
-ecs:create_entity(
-    "0,0",
-    ent.Transform:new(
-        Vec2:new(0, 0),
-        Vec2:new(0, 0)
-    )
-)
 
 return world

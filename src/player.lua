@@ -42,9 +42,7 @@ function Player:update(dt, scroll)
 end
 
 function Player:draw(scroll)
-    local px = self.x
-    local py = self.y
-    love.graphics.rectangle("fill", px, py, 30, 30)
+    love.graphics.rectangle("fill", self.x, self.y, 30, 30)
 end
 
 function Player:interact(scroll)

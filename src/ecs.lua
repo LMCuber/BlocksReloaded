@@ -46,8 +46,10 @@ function ecs:_get_components(chunk, ...)
     local final_entity_data = {}
     for _, ent_id in ipairs(intersected_entities) do
         local comp_objects = {}
+
         for _, comp_type in ipairs(comp_types) do
             local comp_name = comp_type._name
+            -- print(entity_manager.entities[ent_id][comp_name])
             table.insert(comp_objects, entity_manager.entities[ent_id][comp_name])
         end
 

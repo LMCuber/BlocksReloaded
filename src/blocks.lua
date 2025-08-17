@@ -52,9 +52,9 @@ local block_list = {
     {"corn-crop_vr0.0", "corn-crop_vr1.0",  "corn-crop_vr2.0", "corn-crop_vr3.0", "corn-crop_vr4.0", "cattail",          "pampas",      "",            "",             "",            "",            "pillar_vr0"},
 }
 
-local sprs_data = love.image.newImageData("res/blocks.png")
+local sprs_data = love.image.newImageData("res/images/spritesheets/blocks.png")
 blocks = {
-    sprs = love.graphics.newImage("res/blocks.png"),
+    sprs = love.graphics.newImage("res/images/spritesheets/blocks.png"),
     quads = {},
     id = {},
     name = {},

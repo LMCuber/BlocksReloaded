@@ -2,6 +2,7 @@ blocks = require("src.blocks")
 world = require("src.world")
 player = require("src.player")
 fonts = require("src.fonts")
+systems = require("src.systems")
 
 player.world = world
 
@@ -25,8 +26,11 @@ end
 -- love update
 function love.update(dt)
     apply_scroll()
-    world:update(dt, scroll)
+
+    processed_chunks = world:update(dt, scroll)
     player:update(dt, scroll)
+
+    systems.physics:process(processed_chunks)
 end
 
 -- love draw

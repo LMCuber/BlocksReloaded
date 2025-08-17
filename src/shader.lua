@@ -1,4 +1,4 @@
-local palette_img = love.graphics.newImage("res/2000.png")
+local palette_img = love.graphics.newImage("res/images/palettes/2000.png")
 
 local code = love.filesystem.read("src/default.frag")
 local shader = love.graphics.newShader(code)
