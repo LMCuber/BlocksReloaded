@@ -10,8 +10,7 @@ anim = {
 }
 local entity_types = {"statics"}
 for _, entity_type in ipairs(entity_types) do
-    local file = io.open("res/data/" .. entity_type .. ".yaml")
-    local content = file:read("*a")
+    local content, _ = love.filesystem.read("res/data/" .. entity_type .. ".yaml")
     local yaml_data = yaml.eval(content)
 
     for skin, _ in pairs(yaml_data) do
