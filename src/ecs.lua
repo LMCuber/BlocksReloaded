@@ -17,7 +17,6 @@ local component_manager = {
 
 ecs = {}
 
-
 function ecs:_get_components(chunk, ...)
     -- if chunk does not exist, return nothing
     if not component_manager.components[chunk] then
@@ -49,13 +48,12 @@ function ecs:_get_components(chunk, ...)
 
         for _, comp_type in ipairs(comp_types) do
             local comp_name = comp_type._name
-            -- print(entity_manager.entities[ent_id][comp_name])
             table.insert(comp_objects, entity_manager.entities[ent_id][comp_name])
         end
 
-        local entity_data = {chunk, ent_id}
-        for i = 1, #comp_objects do
-            table.insert(entity_data, comp_objects[i])
+        local entity_data = {ent_id, chunk}
+        for _, comp_obj in ipairs(comp_objects) do
+            table.insert(entity_data, comp_obj)
         end
         table.insert(final_entity_data, entity_data)
     end
@@ -74,6 +72,33 @@ function ecs:get_components(chunks, ...)
     end
 
     return ret
+end
+
+function ecs:delete_entity(ent_id, chunk)
+    if not entity_manager.entities[ent_id] then
+        return
+    end
+
+    for comp_type, _ in pairs(entity_manager.entities[ent_id]) do
+        commons.remove_by_key(component_manager.components[chunk][comp_type], ent_id)
+    end
+
+    entity_manager.entities[ent_id] = nil
+end
+
+function ecs:relocate_entity(ent_id, src_chunk, new_chunk_x, new_chunk_y)
+    -- save entity objects
+    local comp_objects = {}
+    for _, comp_obj in pairs(entity_manager.entities[ent_id]) do
+        table.insert(comp_objects, comp_obj)
+    end
+    
+    -- delete said entity
+    ecs:delete_entity(ent_id, src_chunk)
+
+    -- create new one at new chunk position
+    local new_key = commons.key(new_chunk_x, new_chunk_y)
+    ecs:create_entity(new_key, commons.unpack(comp_objects))
 end
 
 function ecs:create_entity(chunk, ...)

@@ -1,5 +1,33 @@
 local commons = {}
 
+-- globals (use sparingly, we do not want to pollute the global namespace)
+function _G.test(...)
+    print(love.math.random(0, 999), ...)
+end
+
+function _G.pprint(tbl, indent)
+    indent = indent or 0
+    local formatting = string.rep("  ", indent)
+
+    if type(tbl) ~= "table" then
+        print(formatting .. tostring(tbl))
+        return
+    end
+
+    print(formatting .. "{")
+    for k, v in pairs(tbl) do
+        local key = tostring(k)
+        if type(v) == "table" then
+            io.write(formatting .. "  " .. key .. " = ")
+            pprint(v, indent + 1)
+        else
+            print(formatting .. "  " .. key .. " = " .. tostring(v))
+        end
+    end
+    print(formatting .. "}")
+end
+
+-- useful functions
 function commons.intersect_n(...)
     local tables = {...}
     local counts = {}
@@ -35,8 +63,8 @@ function commons.unpack(t, i)
 end
 
 function commons.extend(t1, t2)
-    for i = 1, #t2 do
-        table.insert(t1, t2[i])
+    for _, e2 in ipairs(t2) do
+        table.insert(t1, e2)
     end
 end
 
@@ -62,6 +90,24 @@ function commons.contains(tbl, element)
         end
     end
     return false
+end
+
+function commons.remove_by_key(tbl, element)
+    for i, v in ipairs(tbl) do
+        if v == element then
+            table.remove(tbl, i)
+            break
+        end
+    end
+end
+
+function commons.key(cx, cy)
+    return cx .. "," .. cy
+end
+
+function commons.parse_key(key)
+    local cx, cy = key:match("(-?%d+),(-?%d+)")
+    return tonumber(cx), tonumber(cy)
 end
 
 return commons

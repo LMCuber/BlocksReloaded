@@ -1,7 +1,7 @@
 blocks = require("src.blocks")
 biomes = require("src.biome")
 ecs = require("src.ecs")
-ent = require("src.entities")
+comp = require("src.components")
 Vec2 = require("src.Vec2")
 systems = require("src.systems")
 fonts = require("src.fonts")
@@ -13,7 +13,7 @@ local MAX_LIGHT = 12
 -- love event handlers
 function love.keypressed(key, scancode, isrepeat)
     if key == "space" then
-        world.lighting = not world.lighting
+    world.lighting = not world.lighting
     end
 end
 
@@ -38,16 +38,6 @@ function World:new()
 
     return obj
 end
-
-function World:key(cx, cy)
-    return cx .. "," .. cy
-end
-
-function World:parse_key(key)
-    local cx, cy = key:match("(%d+),(%d+)")
-    return tonumber(cx), tonumber(cy)
-end
-
 
 function World:octave_noise(args)
     args = args or {}
@@ -77,7 +67,7 @@ end
 
 function World:create_chunk(cx, cy)
     -- initialize chunk metadata
-    local key = self:key(cx, cy)
+    local key = commons.key(cx, cy)
     local chunk = {}
     self.data[key] = chunk
 
@@ -207,7 +197,7 @@ function World:modify_chunk(key)
         return love.math.random() <= n
     end
 
-    local chunk_x, chunk_y = self:parse_key(key)
+    local chunk_x, chunk_y = commons.parse_key(key)
     local chunk = self.data[key]
 
     for x = 1, CW do
@@ -278,11 +268,11 @@ function World:modify_chunk(key)
                 if chance(1 / 10) then
                     ecs:create_entity(
                         key,
-                        ent.Transform:new(
-                            Vec2:new(abs_x * BS, abs_y * BS),
+                        comp.Transform:new(
+                            Vec2:new(abs_x * BS, (abs_y - 7) * BS),
                             Vec2:new(0, 0)
                         ),
-                        ent.Sprite:from_path("res/images/spritesheets/blocks.png")
+                        comp.Sprite:from_path("res/images/statics/portal/idle.png")
                     )
                 end
             end
@@ -321,7 +311,7 @@ end
 function World:get_tile(block_x, block_y)
     local chunk_x = math.floor(block_x / CW)
     local chunk_y = math.floor(block_y / CH)
-    local key = self:key(chunk_x, chunk_y)
+    local key = commons.key(chunk_x, chunk_y)
     local chunk = self.data[key]
     if not chunk then
         chunk = self:create_chunk(chunk_x, chunk_y)
@@ -338,7 +328,7 @@ function World:mouse_to_block(mx, my, scroll)
     local chunk_x = math.floor(block_x / CW)
     local chunk_y = math.floor(block_y / CH)
 
-    local key = self:key(chunk_x, chunk_y)
+    local key = commons.key(chunk_x, chunk_y)
 
     local rel_x = (block_x % CW) + 1
     local rel_y = (block_y % CH) + 1
@@ -400,11 +390,12 @@ function World:propagate_lighting(scroll)
 
         end
     end
-    
+
     -- from the topleft and topright chunks, get intermediate chunks
-    for y = chunk_topleft.y, chunk_bottomright.y do
-        for x = chunk_topleft.x, chunk_bottomright.x do
-            table.insert(self.processed_chunks, self:key(x, y))
+    local safe = 1
+    for y = chunk_topleft.y - safe, chunk_bottomright.y + safe do
+        for x = chunk_topleft.x - safe, chunk_bottomright.x + safe do
+            table.insert(self.processed_chunks, commons.key(x, y))
         end
     end
 
@@ -513,7 +504,8 @@ function World:draw(scroll)
     end
 
     -- E N T I T I E S
-    systems.render:process(self.processed_chunks)
+    local num_rendered_entities = systems.render:process(self.processed_chunks)
+    return num_rendered_entities
 end
 
 local world = World:new()

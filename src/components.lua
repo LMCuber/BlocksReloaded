@@ -1,5 +1,6 @@
 Vec2 = require("src.Vec2")
 
+-- C O M P O N E N T S
 Transform = {}
 Transform.__index = Transform
 Transform._name = "Transform"
@@ -9,7 +10,7 @@ function Transform:new(pos, vel, gravity, sines, rot, rot_vel)
 
     obj.pos = pos
     obj.vel = vel
-    obj.gravity = gravity or 0.001
+    obj.gravity = gravity or 100
     obj.acc = Vec2:new(0, 0)
     obj.active = true
     obj.sines = Vec2:new(0, 0)
@@ -38,15 +39,31 @@ function Sprite:from_path(path)
     local obj = setmetatable({}, Sprite)
 
     obj.path = path
-    obj.img = love.graphics.newImage(path)
+    obj.anim_skin, obj.anim_mode = path:match(".*/(.-)/(.-)%.png$")  -- (portal, idle)
 
+    obj.img = love.graphics.newImage(path)
+    obj.anim = 1
     return obj
 
+end
+
+Hitbox = {}
+Hitbox.__index = Hitbox
+Hitbox._name = "Hitbox"
+
+function Hitbox:new(x, y, w, h)
+    local obj = setmetatable({}, Hitbox)
+
+    obj.x, obj.y, obj.w, obj.h = x, y, w, h
+    
+    return obj
 end
 
 entity = {
     Transform = Transform,
     Sprite = Sprite,
+    Hitbox = Hitbox,
 }
+
 
 return entity

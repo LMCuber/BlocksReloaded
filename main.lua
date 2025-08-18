@@ -3,6 +3,7 @@ world = require("src.world")
 player = require("src.player")
 fonts = require("src.fonts")
 systems = require("src.systems")
+Color = require("src.color")
 
 player.world = world
 
@@ -25,11 +26,13 @@ end
 
 -- love update
 function love.update(dt)
+    _G.dt = dt
     apply_scroll()
 
     processed_chunks = world:update(dt, scroll)
     player:update(dt, scroll)
 
+    systems.relocate:process(processed_chunks)
     systems.physics:process(processed_chunks)
 end
 
@@ -40,17 +43,16 @@ function love.draw()
     love.graphics.translate(-scroll.x, -scroll.y)
 
     -- update the components
-    world:draw(scroll)
+    local num_rendered_entities = world:draw(scroll)
     player:draw(scroll)
 
     love.graphics.pop()
 
-    -- FPS
-    love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.rectangle("fill", 0, 0, 136, 40)
-    love.graphics.setColor(0, 0, 0, 1)
+    -- FPS, debug, etc.
+    love.graphics.setColor(Color.ORANGE)
     love.graphics.setFont(fonts.orbitron[24])
-    love.graphics.setColor(0, 0, 0, 1)
     love.graphics.print("FPS: " .. love.timer.getFPS(), 6, 6)
+    love.graphics.setFont(fonts.orbitron[18])
+    love.graphics.print("ent. " .. num_rendered_entities, 6, 34)
     love.graphics.setColor(1, 1, 1, 1)
 end
