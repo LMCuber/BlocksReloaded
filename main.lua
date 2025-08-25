@@ -10,12 +10,23 @@ player.world = world
 local fake_scroll = { x = 0, y = 0 }
 local scroll = { x = 0, y = 0 }
 
+debug_rects = {}
+
 -- functions
 function apply_scroll()
     fake_scroll.x = fake_scroll.x + (player.x - fake_scroll.x - WIDTH / 2 + 15)
     fake_scroll.y = fake_scroll.y + (player.y - fake_scroll.y - HEIGHT / 2 + 15)
     scroll.x = math.floor(fake_scroll.x)
     scroll.y = math.floor(fake_scroll.y)
+end
+
+-- love callbacks
+function love.keypressed(key)
+    if key == "escape" then
+        love.event.quit()
+    end
+    
+    world:process_keypress(key)
 end
 
 -- love load
@@ -33,7 +44,7 @@ function love.update(dt)
     player:update(dt, scroll)
 
     systems.relocate:process(processed_chunks)
-    systems.physics:process(processed_chunks)
+    debug_rects = systems.physics:process(processed_chunks)
 end
 
 -- love draw
@@ -45,6 +56,12 @@ function love.draw()
     -- update the components
     local num_rendered_entities = world:draw(scroll)
     player:draw(scroll)
+    
+    -- debug hitboxes
+    for _, rect in ipairs(debug_rects) do
+        love.graphics.setColor(rect[5] or {1, 0, 0})
+        love.graphics.rectangle("line", rect[1], rect[2], rect[3], rect[4])
+    end
 
     love.graphics.pop()
 

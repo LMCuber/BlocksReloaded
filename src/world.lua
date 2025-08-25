@@ -8,14 +8,7 @@ fonts = require("src.fonts")
 
 -- constants
 local VIEW_PADDING = 2
-local MAX_LIGHT = 12
-
--- love event handlers
-function love.keypressed(key, scancode, isrepeat)
-    if key == "space" then
-    world.lighting = not world.lighting
-    end
-end
+local MAX_LIGHT = 15
 
 -- WORLD CLASS
 World = {}
@@ -37,6 +30,12 @@ function World:new()
     love.math.setRandomSeed(obj.x_seed)
 
     return obj
+end
+
+function World:process_keypress(key)
+    if key == "space" then
+        world.lighting = not world.lighting
+    end
 end
 
 function World:octave_noise(args)
@@ -265,15 +264,18 @@ function World:modify_chunk(key)
                 end
 
                 -- entities
-                if chance(1 / 10) then
-                    ecs:create_entity(
-                        key,
-                        comp.Transform:new(
-                            Vec2:new(abs_x * BS, (abs_y - 7) * BS),
-                            Vec2:new(0, 0)
-                        ),
-                        comp.Sprite:from_path("res/images/statics/portal/idle.png")
-                    )
+                if chance(1 / 1) and string.sub(key, 1, 1) == "0" and x == 1 then
+                    for i = 1, 1 do
+                        ecs:create_entity(
+                            key,
+                            comp.Transform:new(
+                                Vec2:new(abs_x * BS, (abs_y - 7 - i) * BS),
+                                Vec2:new(0, 0)
+                            ),
+                            comp.Sprite:from_path("res/images/statics/portal/idle.png"),
+                            comp.Hitbox:late()
+                        )
+                    end
                 end
             end
 
@@ -302,18 +304,18 @@ function World:modify_chunk(key)
     return chunk
 end
 
-function World:get_tile_key(block_x, block_y)
+function World:get_tile_chunk(block_x, block_y)
     local chunk_x = math.floor(block_x / CW)
     local chunk_y = math.floor(block_y / CH)
     return Vec2:new(chunk_x, chunk_y)
 end
 
-function World:get_tile(block_x, block_y)
+function World:get_tile(block_x, block_y, dont_create_if_empty)
     local chunk_x = math.floor(block_x / CW)
     local chunk_y = math.floor(block_y / CH)
     local key = commons.key(chunk_x, chunk_y)
     local chunk = self.data[key]
-    if not chunk then
+    if not chunk and not dont_create_if_empty then 
         chunk = self:create_chunk(chunk_x, chunk_y)
     end
     local rel_x = (block_x % CW) + 1
@@ -383,9 +385,9 @@ function World:propagate_lighting(scroll)
 
             -- save the topleft and bottomright chunks
             if tx == min_x and ty == min_y then
-                chunk_topleft = self:get_tile_key(tx, ty)
+                chunk_topleft = self:get_tile_chunk(tx, ty)
             elseif tx == max_x and ty == max_y then
-                chunk_bottomright = self:get_tile_key(tx, ty)
+                chunk_bottomright = self:get_tile_chunk(tx, ty)
             end
 
         end
@@ -509,5 +511,7 @@ function World:draw(scroll)
 end
 
 local world = World:new()
+
+systems.physics.world = world
 
 return world

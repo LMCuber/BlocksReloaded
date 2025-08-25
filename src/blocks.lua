@@ -11,14 +11,16 @@ _G.WIDTH, _G.HEIGHT = love.graphics.getDimensions()
 
 -- block flags
 _G.BF = {
-    NONE         =     0,
+    NONE         =     0,  -- not an empty block block; just means that there is no flag
     LIGHT_SOURCE = 2 ^ 0,
     ORE          = 2 ^ 1,
+    WALKABLE     = 2 ^ 2,
 }
 
+-- FLAGS GET STRING NAME AS INPUT, NOT ID!!!
 flags = {
-    air = BF.LIGHT_SOURCE,
-    torch = BF.LIGHT_SOURCE,
+    air          = bit.bor(BF.WALKABLE, BF.LIGHT_SOURCE),
+    torch        = BF.LIGHT_SOURCE,
     ["base-ore"] = BF.ORE,
 }
 

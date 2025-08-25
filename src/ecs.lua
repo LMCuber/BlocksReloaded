@@ -17,6 +17,10 @@ local component_manager = {
 
 ecs = {}
 
+function ecs:get_component(ent_id, comp_type)
+    return entity_manager.entities[ent_id][comp_type._name]
+end
+
 function ecs:_get_components(chunk, ...)
     -- if chunk does not exist, return nothing
     if not component_manager.components[chunk] then

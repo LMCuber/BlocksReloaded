@@ -51,12 +51,31 @@ Hitbox = {}
 Hitbox.__index = Hitbox
 Hitbox._name = "Hitbox"
 
-function Hitbox:new(x, y, w, h)
+function Hitbox:new(w, h)
     local obj = setmetatable({}, Hitbox)
 
-    obj.x, obj.y, obj.w, obj.h = x, y, w, h
+    obj.w, obj.h = w, h
     
     return obj
+end
+
+function Hitbox:late()
+    local obj = setmetatable({}, Hitbox)
+
+    obj.late = true
+
+    return obj
+end
+
+function Hitbox:aabb(x, y, other, ox, oy)
+    return x < ox + other.w and
+        x + self.w > ox and
+        y < oy + other.h and
+        y + self.h > oy
+end
+
+function Hitbox:__tostring()
+    return string.format("Hitbox(%d, %d)", self.w, self.h)
 end
 
 entity = {

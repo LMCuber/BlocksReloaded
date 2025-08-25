@@ -62,7 +62,7 @@ systems = {
 function systems.render:process(chunks)
     local num_rendered = 0
 
-    for _, entry in ipairs(ecs:get_components(chunks, ent.Transform, ent.Sprite)) do
+    for _, entry in ipairs(ecs:get_components(chunks, comp.Transform, comp.Sprite)) do
         local ent_id, chunk, tr, sprite = commons.unpack(entry)
 
         local sprs, quads, anim_speed, num_frames = anim.get(sprite.anim_skin, sprite.anim_mode)
@@ -82,17 +82,59 @@ function systems.render:process(chunks)
 end
 
 function systems.physics:process(chunks)
-    for _, entry in ipairs(ecs:get_components(chunks, ent.Transform, ent.Sprite)) do
+    local debug_rects = {}
+
+    for _, entry in ipairs(ecs:get_components(chunks, comp.Transform, comp.Sprite)) do
         local ent_id, chunk, tr, sprite = commons.unpack(entry)
+
+        -- check if hitbox component exists: if so, check for collisions later
+        local hitbox = ecs:get_component(ent_id, Hitbox)
 
         -- gravity
         tr.vel.y = tr.vel.y + tr.gravity * _G.dt
         tr.pos.y = tr.pos.y + tr.vel.y * _G.dt
+
+        print(tr.vel.y)
+
+        if hitbox ~= nil then
+            if hitbox.late then
+                
+                local _, quads, _, _ = anim.get(sprite.anim_skin, sprite.anim_mode)
+                local x, y, w, h = quads[math.floor(sprite.anim)]:getViewport()
+                -- account for pixel art scaling
+                hitbox.w = w * S
+                hitbox.h = h * S
+            end
+
+            table.insert(debug_rects, {tr.pos.x, tr.pos.y, hitbox.w, hitbox.h})
+
+            local o = 3
+            for x = -o, o do
+                for y = -o, o do
+                    local tx = math.floor((tr.pos.x + hitbox.w / 2) / BS) + x
+                    local ty = math.floor((tr.pos.y + hitbox.h / 2) / BS) + y
+                    local block_hitbox = comp.Hitbox:new(BS, BS)
+                    
+                    table.insert(debug_rects, {tx * BS, ty * BS, BS, BS, {1, 0.7, 0}})
+
+                    -- check colliding block name
+                    local name = blocks.name[self.world:get_tile(tx, ty)]
+                    if nbwand(name, BF.WALKABLE) then
+                        -- entity hitbox against block hitbox
+                        if hitbox:aabb(tr.pos.x, tr.pos.y, block_hitbox, tx * BS, ty * BS) then
+                            tr.vel.y = -100
+                        end
+                    end
+                end
+            end
+        end
     end
+
+    return debug_rects
 end
 
 function systems.relocate:process(chunks)
-    for _, entry in ipairs(ecs:get_components(chunks, ent.Transform)) do
+    for _, entry in ipairs(ecs:get_components(chunks, comp.Transform)) do
         local ent_id, chunk, tr = commons.unpack(entry)
 
         local chunk_x, chunk_y = commons.parse_key(chunk)
