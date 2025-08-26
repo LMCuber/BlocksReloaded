@@ -264,7 +264,9 @@ function World:modify_chunk(key)
                 end
 
                 -- entities
-                if chance(1 / 1) and string.sub(key, 1, 1) == "0" and x == 1 then
+                if chance(1 / 1)
+                        and string.sub(key, 1, 1) == "0" and x == 1
+                        then
                     for i = 1, 1 do
                         ecs:create_entity(
                             key,
@@ -338,8 +340,25 @@ function World:mouse_to_block(mx, my, scroll)
     return key, rel_x, rel_y
 end
 
+function World:get_blocks_around_pos(x, y, o)
+    positions = {}
+    o = o or 3
+    for yo = -o, o do
+        for xo = -o, o do
+            local tx = math.floor(x / BS) + xo
+            local ty = math.floor(y / BS) + yo
+            local name = blocks.name[self:get_tile(tx, ty)]
+
+            if nbwand(name, BF.WALKABLE) then
+                table.insert(positions, Vec2:new(tx * BS, ty * BS))
+            end
+        end
+    end
+    return positions
+end
+
 function World:break_(key, block_x, block_y)
-    self.data[key][block_x][block_y] = blocks.id["torch"]
+    self.data[key][block_x][block_y] = blocks.id["air"]
 end
 
 function World:update(dt, scroll)

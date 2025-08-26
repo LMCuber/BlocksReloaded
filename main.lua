@@ -1,23 +1,26 @@
 blocks = require("src.blocks")
 world = require("src.world")
-player = require("src.player")
+Player = require("src.player")
 fonts = require("src.fonts")
 systems = require("src.systems")
 Color = require("src.color")
 
-player.world = world
+player = Player:new(world)
 
-local fake_scroll = { x = 0, y = 0 }
-local scroll = { x = 0, y = 0 }
+local fake_scroll = Vec2:new(0, 0)
+local scroll = Vec2:new(0, 0)
 
 debug_rects = {}
 
 -- functions
 function apply_scroll()
-    fake_scroll.x = fake_scroll.x + (player.x - fake_scroll.x - WIDTH / 2 + 15)
-    fake_scroll.y = fake_scroll.y + (player.y - fake_scroll.y - HEIGHT / 2 + 15)
+    local m = 1
+    fake_scroll.x = fake_scroll.x + (player.pos.x - fake_scroll.x - WIDTH / 2 + 15) * m
+    fake_scroll.y = fake_scroll.y + (player.pos.y - fake_scroll.y - HEIGHT / 2 + 15) * m
     scroll.x = math.floor(fake_scroll.x)
     scroll.y = math.floor(fake_scroll.y)
+    scroll.x = fake_scroll.x
+    scroll.y = fake_scroll.y
 end
 
 -- love callbacks
@@ -27,12 +30,13 @@ function love.keypressed(key)
     end
     
     world:process_keypress(key)
+    player:process_keypress(key)
 end
 
 -- love load
 function love.load()
     love.graphics.setBackgroundColor(1, 1, 1, 0)
-    player.y = BS * (CH * 2)
+    player.pos.y = BS * (CH * 1)
 end
 
 -- love update

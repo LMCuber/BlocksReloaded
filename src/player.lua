@@ -1,3 +1,5 @@
+Vec2 = require("src.Vec2")
+
 -- constants
 BlockAction = {
     PLACE = 0,
@@ -26,23 +28,46 @@ Player.__index = Player
 function Player:new(world)
     local obj = {
         world = world,
-        x = 0,
-        y = 0,
-        speed = 1000,
+        pos = Vec2:new(0, 0),
+        vel = Vec2:new(0, 0),
+        hitbox = Hitbox:new(BS, BS),
+        jump_vel = -600,
+        speed = 350,
+        coyote = 0.15,
         mouse_down,
         block_action = BlockAction.NONE,
     }
+    obj.jump_capture = nil
+    obj.ground_capture = nil
+
     setmetatable(obj, Player)
     return obj
 end
 
+function Player:process_keypress(key)
+    if key == "w" then
+        -- check if grounded
+        if self.vel.y == 0 then
+            self.vel.y = self.jump_vel
+
+        -- check if coyote timer is small enough
+        elseif love.timer.getTime() - self.ground_capture <= self.coyote then
+            self.vel.y = self.jump_vel
+
+        else
+            -- save jump capture (buffer)
+            self.jump_capture = love.timer.getTime()
+        end
+    end
+end
+
 function Player:update(dt, scroll)
-    self:move(dt)
+    self:move(dt, scroll)
     self:interact(scroll)
 end
 
 function Player:draw(scroll)
-    love.graphics.rectangle("fill", self.x, self.y, 30, 30)
+    love.graphics.rectangle("fill", self.pos.x, self.pos.y, BS, BS)
 end
 
 function Player:interact(scroll)
@@ -55,21 +80,67 @@ function Player:interact(scroll)
     end
 end
 
-function Player:move(dt)
-    if love.keyboard.isDown("w") then
-        self.y = self.y - self.speed * dt
+function Player:move(dt, scroll)
+    -- process jump capture
+    if self.vel.y == 0 and self.jump_capture ~= nil and love.timer.getTime() - self.jump_capture <= self.coyote then
+        self.vel.y = self.jump_vel
+        self.jump_capture = nil
     end
-    if love.keyboard.isDown("s") then
-        self.y = self.y + self.speed * dt
+
+    -- Y-COLLISION
+    self.vel.y = self.vel.y + _G.GRAVITY * dt
+    self.pos.y = self.pos.y + self.vel.y * dt
+
+    for _, block_pos in ipairs(self.world:get_blocks_around_pos(
+        self.pos.x + self.hitbox.w / 2,
+        self.pos.y + self.hitbox.h / 2
+    )) do
+        local block_hitbox = comp.Hitbox:new(BS, BS)
+
+        if self.hitbox:aabb(self.pos.x, self.pos.y, block_hitbox, block_pos.x, block_pos.y) then
+            if self.vel.y > 0 then
+                self.pos.y = block_pos.y - self.hitbox.h
+            else
+                self.pos.y = block_pos.y + BS
+            end
+            self.vel.y = 0
+            self.ground_capture = love.timer.getTime()
+        end
     end
+
+    -- X-COLLISION
+    local moved = false
     if love.keyboard.isDown("a") then
-        self.x = self.x - self.speed * dt
+        self.vel.x = -self.speed
+        moved = true
     end
     if love.keyboard.isDown("d") then
-        self.x = self.x + self.speed * dt
+        self.vel.x = self.speed
+        moved = true
     end
+    if not moved then
+        self.vel.x = 0
+    end
+    self.pos.x = self.pos.x + self.vel.x * dt
+
+    for _, block_pos in ipairs(self.world:get_blocks_around_pos(
+        self.pos.x + self.hitbox.w / 2,
+        self.pos.y + self.hitbox.h / 2
+    )) do
+        local block_hitbox = comp.Hitbox:new(BS, BS)
+
+        if self.hitbox:aabb(self.pos.x, self.pos.y, block_hitbox, block_pos.x, block_pos.y) then
+            if self.vel.x > 0 then
+                self.pos.x = block_pos.x - self.hitbox.w
+            else
+                self.pos.x = block_pos.x + BS
+            end
+            self.vel.x = 0
+        end
+    end
+
+    -- print(self.pos.x - scroll.x)
+    
 end
 
-player = Player:new()
-
-return player
+return Player

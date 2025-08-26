@@ -3,3 +3,4 @@ portal:
     idle:
         frames: 7
         speed: 5
+        offset: 0

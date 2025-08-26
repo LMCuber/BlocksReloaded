@@ -12,18 +12,31 @@ _G.WIDTH, _G.HEIGHT = love.graphics.getDimensions()
 -- block flags
 _G.BF = {
     NONE         =     0,  -- not an empty block block; just means that there is no flag
-    LIGHT_SOURCE = 2 ^ 0,
-    ORE          = 2 ^ 1,
-    WALKABLE     = 2 ^ 2,
+    WALKABLE     = 2 ^ 0,  -- anything walkable
+    LIGHT_SOURCE = 2 ^ 1,  -- air, torch, jack-o-lantern, etc.
+    ORE          = 2 ^ 2,  -- coal, titanium, diamond, etc.
+    ORNAMENT     = 2 ^ 3,  -- flowers, rocks, etc. Must be walkable.
 }
 
 -- FLAGS GET STRING NAME AS INPUT, NOT ID!!!
 flags = {
-    air          = bit.bor(BF.WALKABLE, BF.LIGHT_SOURCE),
-    torch        = BF.LIGHT_SOURCE,
-    ["base-ore"] = BF.ORE,
+    air              = bit.bor(BF.WALKABLE, BF.LIGHT_SOURCE),
+    torch            = BF.LIGHT_SOURCE,
+    ["base-ore"]     = BF.ORE,
+    ["red-poppy"]    = BF.ORNAMENT,
+    ["yellow-poppy"] = BF.ORNAMENT,
+    ["orchid"]       = BF.ORNAMENT,
 }
 
+-- mutual flags
+for name, flag in pairs(flags) do
+    -- all ornaments are walkable by default
+    if bit.band(flag, BF.ORNAMENT) ~= 0 then
+        flags[name] = bit.bor(flag, BF.WALKABLE)
+    end
+end
+
+-- functions
 function _G.bwand(name, flag)
     return bit.band(flags[name] or 0, flag) ~= 0
 end

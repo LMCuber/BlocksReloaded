@@ -10,7 +10,7 @@ function Transform:new(pos, vel, gravity, sines, rot, rot_vel)
 
     obj.pos = pos
     obj.vel = vel
-    obj.gravity = gravity or 100
+    obj.gravity = gravity or _G.GRAVITY
     obj.acc = Vec2:new(0, 0)
     obj.active = true
     obj.sines = Vec2:new(0, 0)

@@ -20,6 +20,7 @@ for _, entity_type in ipairs(entity_types) do
             anim.data[skin][mode] = {}
             anim.data[skin][mode]["frames"] = yaml_data[skin][mode]["frames"]
             anim.data[skin][mode]["speed"] = yaml_data[skin][mode]["speed"]
+            anim.data[skin][mode]["offset"] = yaml_data[skin][mode]["offset"]
             
             anim.data[skin][mode]["sprs"] = love.graphics.newImage(string.format(
                 "res/images/%s/%s/%s.png",  -- stupid fucking lua
@@ -46,10 +47,13 @@ for _, entity_type in ipairs(entity_types) do
 end
 
 function anim.get(skin, mode)
-    return anim.data[skin][mode]["sprs"],
-        anim.data[skin][mode]["quads"],
-        anim.data[skin][mode]["speed"],
-        anim.data[skin][mode]["frames"]
+    return {
+        sprs = anim.data[skin][mode]["sprs"],
+        quads = anim.data[skin][mode]["quads"],
+        frames = anim.data[skin][mode]["frames"],
+        speed = anim.data[skin][mode]["speed"],
+        offset = anim.data[skin][mode]["offset"],
+    }
 end
 
 -- S Y S T E M S
@@ -65,15 +69,15 @@ function systems.render:process(chunks)
     for _, entry in ipairs(ecs:get_components(chunks, comp.Transform, comp.Sprite)) do
         local ent_id, chunk, tr, sprite = commons.unpack(entry)
 
-        local sprs, quads, anim_speed, num_frames = anim.get(sprite.anim_skin, sprite.anim_mode)
+        local anim = anim.get(sprite.anim_skin, sprite.anim_mode)
         
-        sprite.anim = sprite.anim + anim_speed * _G.dt
-        if sprite.anim > num_frames then
+        sprite.anim = sprite.anim + anim.speed * _G.dt
+        if sprite.anim > anim.frames then
             sprite.anim = 1
         end
-        local quad = quads[math.floor(sprite.anim)]
+        local quad = anim.quads[math.floor(sprite.anim)]
 
-        love.graphics.draw(sprs, quad, tr.pos.x, tr.pos.y, 0, S, S)
+        love.graphics.draw(anim.sprs, quad, tr.pos.x, tr.pos.y, 0, S, S)
 
         num_rendered = num_rendered + 1
     end
@@ -94,13 +98,10 @@ function systems.physics:process(chunks)
         tr.vel.y = tr.vel.y + tr.gravity * _G.dt
         tr.pos.y = tr.pos.y + tr.vel.y * _G.dt
 
-        print(tr.vel.y)
-
         if hitbox ~= nil then
             if hitbox.late then
-                
-                local _, quads, _, _ = anim.get(sprite.anim_skin, sprite.anim_mode)
-                local x, y, w, h = quads[math.floor(sprite.anim)]:getViewport()
+                local anim = anim.get(sprite.anim_skin, sprite.anim_mode)
+                local x, y, w, h = anim.quads[math.floor(sprite.anim)]:getViewport()
                 -- account for pixel art scaling
                 hitbox.w = w * S
                 hitbox.h = h * S
@@ -108,23 +109,22 @@ function systems.physics:process(chunks)
 
             table.insert(debug_rects, {tr.pos.x, tr.pos.y, hitbox.w, hitbox.h})
 
-            local o = 3
-            for x = -o, o do
-                for y = -o, o do
-                    local tx = math.floor((tr.pos.x + hitbox.w / 2) / BS) + x
-                    local ty = math.floor((tr.pos.y + hitbox.h / 2) / BS) + y
-                    local block_hitbox = comp.Hitbox:new(BS, BS)
-                    
-                    table.insert(debug_rects, {tx * BS, ty * BS, BS, BS, {1, 0.7, 0}})
+            for _, block_pos in ipairs(self.world:get_blocks_around_pos(
+                tr.pos.x + hitbox.w / 2,
+                tr.pos.y + hitbox.h / 2
+            )) do
+                local block_hitbox = comp.Hitbox:new(BS, BS)
+                
+                table.insert(debug_rects, {block_pos.x, block_pos.y, BS, BS, {1, 0.7, 0}})
 
-                    -- check colliding block name
-                    local name = blocks.name[self.world:get_tile(tx, ty)]
-                    if nbwand(name, BF.WALKABLE) then
-                        -- entity hitbox against block hitbox
-                        if hitbox:aabb(tr.pos.x, tr.pos.y, block_hitbox, tx * BS, ty * BS) then
-                            tr.vel.y = -100
-                        end
+                -- entity hitbox against block hitbox
+                if hitbox:aabb(tr.pos.x, tr.pos.y, block_hitbox, block_pos.x, block_pos.y) then
+                    if tr.vel.y > 0 then
+                        tr.pos.y = block_pos.y - hitbox.h
+                    else
+                        tr.pos.y = block_pos.y + BS
                     end
+                    tr.vel.y = 0
                 end
             end
         end
