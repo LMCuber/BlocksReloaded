@@ -1,9 +1,12 @@
-blocks = require("src.blocks")
-world = require("src.world")
-Player = require("src.player")
-fonts = require("src.fonts")
-systems = require("src.systems")
-Color = require("src.color")
+local Player = require("src.player")
+local Color = require("src.color")
+local Vec2 = require("src.vec2")
+-- 
+local world = require("src.world")
+local fonts = require("src.fonts")
+local systems = require("src.systems")
+local shader = require("src.shader")
+
 
 player = Player:new(world)
 
@@ -13,14 +16,14 @@ local scroll = Vec2:new(0, 0)
 debug_rects = {}
 
 -- functions
-function apply_scroll()
-    local m = 1
+local function apply_scroll(dt)
+    local m = 0.1
     fake_scroll.x = fake_scroll.x + (player.pos.x - fake_scroll.x - WIDTH / 2 + 15) * m
     fake_scroll.y = fake_scroll.y + (player.pos.y - fake_scroll.y - HEIGHT / 2 + 15) * m
     scroll.x = math.floor(fake_scroll.x)
     scroll.y = math.floor(fake_scroll.y)
-    scroll.x = fake_scroll.x
-    scroll.y = fake_scroll.y
+    -- scroll.x = fake_scroll.x
+    -- scroll.y = fake_scroll.y
 end
 
 -- love callbacks
@@ -28,7 +31,7 @@ function love.keypressed(key)
     if key == "escape" then
         love.event.quit()
     end
-    
+
     world:process_keypress(key)
     player:process_keypress(key)
 end
@@ -42,7 +45,7 @@ end
 -- love update
 function love.update(dt)
     _G.dt = dt
-    apply_scroll()
+    apply_scroll(dt)
 
     processed_chunks = world:update(dt, scroll)
     player:update(dt, scroll)
@@ -60,10 +63,10 @@ function love.draw()
     -- update the components
     local num_rendered_entities = world:draw(scroll)
     player:draw(scroll)
-    
+
     -- debug hitboxes
     for _, rect in ipairs(debug_rects) do
-        love.graphics.setColor(rect[5] or {1, 0, 0})
+        love.graphics.setColor(rect[5] or Color.RED)
         love.graphics.rectangle("line", rect[1], rect[2], rect[3], rect[4])
     end
 

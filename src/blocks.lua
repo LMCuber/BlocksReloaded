@@ -1,5 +1,5 @@
-bit = require("bit")
-commons = require("src.commons")
+local bit = require("bit")
+local commons = require("src.commons")
 
 -- constants
 _G.CW = 16
@@ -19,13 +19,13 @@ _G.BF = {
 }
 
 -- FLAGS GET STRING NAME AS INPUT, NOT ID!!!
-flags = {
+local flags = {
     air              = bit.bor(BF.WALKABLE, BF.LIGHT_SOURCE),
     torch            = BF.LIGHT_SOURCE,
     ["base-ore"]     = BF.ORE,
     ["red-poppy"]    = BF.ORNAMENT,
     ["yellow-poppy"] = BF.ORNAMENT,
-    ["orchid"]       = BF.ORNAMENT,
+    orchid           = BF.ORNAMENT,
 }
 
 -- mutual flags
@@ -46,7 +46,7 @@ function _G.nbwand(name, flag)
 end
 
 function _G.norm(name)
-    base, mods = commons.split(name, "|")
+    local base, mods = commons.split(name, "|")
     return base, mods
 end
 
@@ -67,8 +67,7 @@ local block_list = {
     {"corn-crop_vr0.0", "corn-crop_vr1.0",  "corn-crop_vr2.0", "corn-crop_vr3.0", "corn-crop_vr4.0", "cattail",          "pampas",      "",            "",             "",            "",            "pillar_vr0"},
 }
 
-local sprs_data = love.image.newImageData("res/images/spritesheets/blocks.png")
-blocks = {
+local blocks = {
     sprs = love.graphics.newImage("res/images/spritesheets/blocks.png"),
     quads = {},
     id = {},
@@ -99,6 +98,11 @@ for y, layer in ipairs(block_list) do
         blocks.id[name .. "|b"] = id
         blocks.name[id] = name .. "|b"
 
+        -- bg flags
+        flags[name] = flags[name] or BF.NONE
+        flags[name .. "|b"] = bit.bor(flags[name], BF.WALKABLE)
+
+        -- next iteration
         id = id + 1
     end
 end

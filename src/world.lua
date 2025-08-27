@@ -1,10 +1,13 @@
-blocks = require("src.blocks")
-biomes = require("src.biome")
-ecs = require("src.ecs")
-comp = require("src.components")
-Vec2 = require("src.Vec2")
-systems = require("src.systems")
-fonts = require("src.fonts")
+local Vec2 = require("src.vec2")
+local Color = require("src.color")
+-- 
+local blocks = require("src.blocks")
+local biomes = require("src.biome")
+local ecs = require("src.ecs")
+local comp = require("src.components")
+local systems = require("src.systems")
+local fonts = require("src.fonts")
+local commons = require("src.commons")
 
 -- constants
 local VIEW_PADDING = 2
@@ -34,7 +37,7 @@ end
 
 function World:process_keypress(key)
     if key == "space" then
-        world.lighting = not world.lighting
+        self.lighting = not self.lighting
     end
 end
 
@@ -264,8 +267,7 @@ function World:modify_chunk(key)
                 end
 
                 -- entities
-                if chance(1 / 1)
-                        and string.sub(key, 1, 1) == "0" and x == 1
+                if chance(1 / 5)
                         then
                     for i = 1, 1 do
                         ecs:create_entity(
@@ -500,7 +502,7 @@ function World:draw(scroll)
                 lighting_offset.y = ty * BS - scroll.y
             end
 
-            love.graphics.setColor(1, 1, 1, 1)
+            love.graphics.setColor(Color.WHITE)
         end
     end
 
@@ -509,20 +511,22 @@ function World:draw(scroll)
     local darkness = 0.5
     love.graphics.setColor(darkness, darkness, darkness, 1)
     love.graphics.draw(self.bg_batch)
-    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.setColor(Color.WHITE)
 
     -- debugging
-    love.graphics.setColor(1, 0.8, 0.75, 1)
-    love.graphics.setFont(fonts.orbitron[12])
-    for _, x in ipairs(prints) do
-        love.graphics.print(x[1], x[2], x[3])
-    end
+    -- love.graphics.setColor(1, 0.8, 0.75, 1)
+    -- love.graphics.setFont(fonts.orbitron[12])
+    -- for _, x in ipairs(prints) do
+    --     love.graphics.print(x[1], x[2], x[3])
+    -- end
 
     if self.lighting then
         self.light_surf = love.graphics.newImage(self.light_surf)
         -- self.light_surf:setFilter("nearest", "nearest")
         love.graphics.draw(self.light_surf, scroll.x + lighting_offset.x, scroll.y + lighting_offset.y, 0, BS, BS)
     end
+
+    love.graphics.setColor(Color.WHITE)
 
     -- E N T I T I E S
     local num_rendered_entities = systems.render:process(self.processed_chunks)

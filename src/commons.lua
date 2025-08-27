@@ -1,7 +1,7 @@
 local commons = {}
 
 -- globals (use sparingly, we do not want to pollute the global namespace)
-_G.GRAVITY = 1900
+_G.GRAVITY = 2300
 
 function _G.test(...)
     print(love.math.random(0, 999), ...)

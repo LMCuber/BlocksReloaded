@@ -1,63 +1,10 @@
-ecs = require("src.ecs")
-ent = require("src.components")
-commons = require("src.commons")
-yaml = require("src.libs.yaml")
-
-
--- A N I M A T I O N  L O A D I N G  E N G I N E
-anim = {
-    data = {}
-}
-local entity_types = {"statics"}
-for _, entity_type in ipairs(entity_types) do
-    local content, _ = love.filesystem.read("res/data/" .. entity_type .. ".yaml")
-    local yaml_data = yaml.eval(content)
-
-    for skin, _ in pairs(yaml_data) do
-        anim.data[skin] = {}
-
-        for mode, _ in pairs(yaml_data[skin]) do
-            anim.data[skin][mode] = {}
-            anim.data[skin][mode]["frames"] = yaml_data[skin][mode]["frames"]
-            anim.data[skin][mode]["speed"] = yaml_data[skin][mode]["speed"]
-            anim.data[skin][mode]["offset"] = yaml_data[skin][mode]["offset"]
-            
-            anim.data[skin][mode]["sprs"] = love.graphics.newImage(string.format(
-                "res/images/%s/%s/%s.png",  -- stupid fucking lua
-                entity_type, skin, mode
-            ))
-            anim.data[skin][mode]["sprs"]:setFilter("nearest", "nearest")
-         
-            anim.data[skin][mode]["quads"] = {}
-            for i = 1, anim.data[skin][mode]["frames"] do
-                local w = anim.data[skin][mode]["sprs"]:getWidth() / anim.data[skin][mode]["frames"]
-                local h = anim.data[skin][mode]["sprs"]:getHeight()
-                local x = (i - 1) * w
-                table.insert(
-                    anim.data[skin][mode]["quads"],
-                    love.graphics.newQuad(
-                        x, 0, w, h,
-                        anim.data[skin][mode]["sprs"]:getWidth(),
-                        anim.data[skin][mode]["sprs"]:getHeight()
-                    )
-                )
-            end
-        end
-    end
-end
-
-function anim.get(skin, mode)
-    return {
-        sprs = anim.data[skin][mode]["sprs"],
-        quads = anim.data[skin][mode]["quads"],
-        frames = anim.data[skin][mode]["frames"],
-        speed = anim.data[skin][mode]["speed"],
-        offset = anim.data[skin][mode]["offset"],
-    }
-end
+local ecs = require("src.ecs")
+local comp = require("src.components")
+local commons = require("src.commons")
+local anim = require("src.animation")
 
 -- S Y S T E M S
-systems = {
+local systems = {
     render = {},
     physics = {},
     relocate = {},
@@ -67,17 +14,17 @@ function systems.render:process(chunks)
     local num_rendered = 0
 
     for _, entry in ipairs(ecs:get_components(chunks, comp.Transform, comp.Sprite)) do
-        local ent_id, chunk, tr, sprite = commons.unpack(entry)
+        local _, _, tr, sprite = commons.unpack(entry)
 
-        local anim = anim.get(sprite.anim_skin, sprite.anim_mode)
+        local anim_data = anim.get(sprite.anim_skin, sprite.anim_mode)
         
-        sprite.anim = sprite.anim + anim.speed * _G.dt
-        if sprite.anim > anim.frames then
+        sprite.anim = sprite.anim + anim_data.speed * _G.dt
+        if sprite.anim > anim_data.frames + 1 then
             sprite.anim = 1
         end
-        local quad = anim.quads[math.floor(sprite.anim)]
+        local quad = anim_data.quads[math.floor(sprite.anim)]
 
-        love.graphics.draw(anim.sprs, quad, tr.pos.x, tr.pos.y, 0, S, S)
+        love.graphics.draw(anim_data.sprs, quad, tr.pos.x, tr.pos.y, 0, S, S)
 
         num_rendered = num_rendered + 1
     end
@@ -89,10 +36,10 @@ function systems.physics:process(chunks)
     local debug_rects = {}
 
     for _, entry in ipairs(ecs:get_components(chunks, comp.Transform, comp.Sprite)) do
-        local ent_id, chunk, tr, sprite = commons.unpack(entry)
+        local ent_id, _, tr, sprite = commons.unpack(entry)
 
         -- check if hitbox component exists: if so, check for collisions later
-        local hitbox = ecs:get_component(ent_id, Hitbox)
+        local hitbox = ecs:try_component(ent_id, comp.Hitbox)
 
         -- gravity
         tr.vel.y = tr.vel.y + tr.gravity * _G.dt
@@ -100,8 +47,8 @@ function systems.physics:process(chunks)
 
         if hitbox ~= nil then
             if hitbox.late then
-                local anim = anim.get(sprite.anim_skin, sprite.anim_mode)
-                local x, y, w, h = anim.quads[math.floor(sprite.anim)]:getViewport()
+                local anim_data = anim.get(sprite.anim_skin, sprite.anim_mode)
+                local x, y, w, h = anim_data.quads[math.floor(sprite.anim)]:getViewport()
                 -- account for pixel art scaling
                 hitbox.w = w * S
                 hitbox.h = h * S

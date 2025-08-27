@@ -1,4 +1,4 @@
-commons = require("src.commons")
+local commons = require("src.commons")
 
 local entity_manager = {
     counter = 0,
@@ -15,9 +15,9 @@ local component_manager = {
     components = {},
 }
 
-ecs = {}
+local ecs = {}
 
-function ecs:get_component(ent_id, comp_type)
+function ecs:try_component(ent_id, comp_type)
     return entity_manager.entities[ent_id][comp_type._name]
 end
 

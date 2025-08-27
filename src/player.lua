@@ -1,4 +1,8 @@
-Vec2 = require("src.Vec2")
+local Vec2 = require("src.vec2")
+local Color = require("src.color")
+-- 
+local comp = require("src.components")
+local anim = require("src.animation")
 
 -- constants
 BlockAction = {
@@ -22,6 +26,12 @@ function love.mousereleased(mouse_x, mouse_y, button)
 end
 
 -- player class
+local Direction = {
+    LEFT = 0,
+    RIGHT = 1,
+    NONE = 2,
+}
+
 local Player = {}
 Player.__index = Player
 
@@ -30,15 +40,21 @@ function Player:new(world)
         world = world,
         pos = Vec2:new(0, 0),
         vel = Vec2:new(0, 0),
-        hitbox = Hitbox:new(BS, BS),
-        jump_vel = -600,
+        anim_skin = "samurai",
+        anim_mode = "run",
+        jump_vel = -650,
         speed = 350,
-        coyote = 0.15,
-        mouse_down,
+        jump_buffer = 0.15,
+        coyote = 0.1,
+        hitbox = comp.Hitbox:new(50, 70),
+        mouse_down = false,
         block_action = BlockAction.NONE,
+        direc = Direction.NONE,
     }
     obj.jump_capture = nil
     obj.ground_capture = nil
+
+    obj.sprite = comp.Sprite:from_path(string.format("res/images/player_animations/%s/%s.png", obj.anim_skin, obj.anim_mode))
 
     setmetatable(obj, Player)
     return obj
@@ -67,7 +83,40 @@ function Player:update(dt, scroll)
 end
 
 function Player:draw(scroll)
-    love.graphics.rectangle("fill", self.pos.x, self.pos.y, BS, BS)
+    local anim_data = anim.get(self.anim_skin, self.anim_mode)
+
+    self.sprite.anim = self.sprite.anim + anim_data.speed * _G.dt
+    if self.sprite.anim > anim_data.frames + 1 then
+        self.sprite.anim = 1
+    end
+
+    local quad = anim_data.quads[math.floor(self.sprite.anim)]
+
+    local _, _, img_w, img_h = quad:getViewport()
+    img_w = img_w * S
+    img_h = img_h * S
+
+    local draw_x = math.floor(self.pos.x + self.hitbox.w / 2 - img_w / 2)
+    local draw_y = math.floor(self.pos.y + self.hitbox.h / 2 - img_h / 2)
+
+    love.graphics.draw(
+        anim_data.sprs,
+        quad,
+        draw_x + (self.direc == Direction.LEFT and img_w or 0),
+        draw_y, 0,
+        (self.direc == Direction.LEFT and -1 or 1) * S,
+        S
+    )
+
+    -- rendering location
+    love.graphics.setColor(Color.CYAN)
+    love.graphics.rectangle("line", draw_x, draw_y, img_w, img_h)
+
+    -- hitbox location
+    love.graphics.setColor(Color.RED)
+    love.graphics.rectangle("line", math.floor(self.pos.x), math.floor(self.pos.y), self.hitbox.w, self.hitbox.h)
+
+    love.graphics.setColor(Color.WHITE)
 end
 
 function Player:interact(scroll)
@@ -82,7 +131,7 @@ end
 
 function Player:move(dt, scroll)
     -- process jump capture
-    if self.vel.y == 0 and self.jump_capture ~= nil and love.timer.getTime() - self.jump_capture <= self.coyote then
+    if self.vel.y == 0 and self.jump_capture ~= nil and love.timer.getTime() - self.jump_capture <= self.jump_buffer then
         self.vel.y = self.jump_vel
         self.jump_capture = nil
     end
@@ -109,17 +158,20 @@ function Player:move(dt, scroll)
     end
 
     -- X-COLLISION
-    local moved = false
+    self.direc = Direction.NONE
     if love.keyboard.isDown("a") then
         self.vel.x = -self.speed
-        moved = true
+        self.direc = Direction.LEFT
     end
     if love.keyboard.isDown("d") then
         self.vel.x = self.speed
-        moved = true
+        self.direc = Direction.RIGHT
     end
-    if not moved then
+    if self.direc == Direction.NONE then
         self.vel.x = 0
+        self.anim_mode = "idle"
+    else
+        self.anim_mode = "run"
     end
     self.pos.x = self.pos.x + self.vel.x * dt
 
@@ -140,7 +192,7 @@ function Player:move(dt, scroll)
     end
 
     -- print(self.pos.x - scroll.x)
-    
+
 end
 
 return Player

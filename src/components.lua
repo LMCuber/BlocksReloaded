@@ -1,7 +1,7 @@
-Vec2 = require("src.Vec2")
+local Vec2 = require("src.Vec2")
 
 -- C O M P O N E N T S
-Transform = {}
+local Transform = {}
 Transform.__index = Transform
 Transform._name = "Transform"
 
@@ -31,7 +31,7 @@ function Transform:new(pos, vel, gravity, sines, rot, rot_vel)
     return obj
 end
 
-Sprite = {}
+local Sprite = {}
 Sprite.__index = Sprite
 Sprite._name = "Sprite"
 
@@ -39,6 +39,7 @@ function Sprite:from_path(path)
     local obj = setmetatable({}, Sprite)
 
     obj.path = path
+    
     obj.anim_skin, obj.anim_mode = path:match(".*/(.-)/(.-)%.png$")  -- (portal, idle)
 
     obj.img = love.graphics.newImage(path)
@@ -47,7 +48,7 @@ function Sprite:from_path(path)
 
 end
 
-Hitbox = {}
+local Hitbox = {}
 Hitbox.__index = Hitbox
 Hitbox._name = "Hitbox"
 
@@ -78,11 +79,11 @@ function Hitbox:__tostring()
     return string.format("Hitbox(%d, %d)", self.w, self.h)
 end
 
-entity = {
+local comp = {
     Transform = Transform,
     Sprite = Sprite,
     Hitbox = Hitbox,
 }
 
 
-return entity
+return comp

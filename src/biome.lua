@@ -1,4 +1,4 @@
-biomes = {
+local biomes = {
     Forest = {
         top = "soil_f",
         dirt = "dirt_f",

@@ -1,4 +1,4 @@
-fonts = {
+local fonts = {
     orbitron = {},
 }
 
