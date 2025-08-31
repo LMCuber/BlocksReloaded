@@ -7,13 +7,14 @@ local fonts = require("src.fonts")
 local systems = require("src.systems")
 local shader = require("src.shader")
 
-
-player = Player:new(world)
-
 local fake_scroll = Vec2:new(0, 0)
 local scroll = Vec2:new(0, 0)
 
-debug_rects = {}
+local player = Player:new(world)
+player.scroll = scroll
+
+
+local debug_rects = {}
 
 -- functions
 local function apply_scroll(dt)
@@ -36,6 +37,14 @@ function love.keypressed(key)
     player:process_keypress(key)
 end
 
+function love.mousepressed(mouse_x, mouse_y, button)
+    player:process_mousepressed(mouse_x, mouse_y, button)
+end
+
+function love.mousereleased(mouse_x, mouse_y, button)
+    player:process_mousereleased(mouse_x, mouse_y, button)
+end
+
 -- love load
 function love.load()
     love.graphics.setBackgroundColor(1, 1, 1, 0)
@@ -47,7 +56,7 @@ function love.update(dt)
     _G.dt = dt
     apply_scroll(dt)
 
-    processed_chunks = world:update(dt, scroll)
+    local processed_chunks = world:update(dt, scroll)
     player:update(dt, scroll)
 
     systems.relocate:process(processed_chunks)
@@ -57,10 +66,9 @@ end
 -- love draw
 function love.draw()
     love.graphics.push()
-
     love.graphics.translate(-scroll.x, -scroll.y)
 
-    -- update the components
+    -- update the main components: world and player
     local num_rendered_entities = world:draw(scroll)
     player:draw(scroll)
 

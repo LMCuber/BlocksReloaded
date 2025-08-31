@@ -1,7 +1,7 @@
 local bit = require("bit")
 local commons = require("src.commons")
 
--- constants
+-- CONSTANTS
 _G.CW = 16
 _G.CH = 16
 _G.BPS = 10
@@ -9,18 +9,25 @@ _G.S = 3
 _G.BS = BPS * S
 _G.WIDTH, _G.HEIGHT = love.graphics.getDimensions()
 
--- block flags
+-- BLOCK FLAGS
 _G.BF = {
-    NONE         =     0,  -- not an empty block block; just means that there is no flag
-    WALKABLE     = 2 ^ 0,  -- anything walkable
-    LIGHT_SOURCE = 2 ^ 1,  -- air, torch, jack-o-lantern, etc.
-    ORE          = 2 ^ 2,  -- coal, titanium, diamond, etc.
-    ORNAMENT     = 2 ^ 3,  -- flowers, rocks, etc. Must be walkable.
+    NONE         = 0,  -- not an empty block block; just means that there is no flag
+    EMPTY        = 0,  -- an empty block (empty means that if it is clicked on, it will place instead of break)
+    WALKABLE     = 0,  -- anything walkable
+    LIGHT_SOURCE = 0,  -- air, torch, jack-o-lantern, etc.
+    ORE          = 0,  -- coal, titanium, diamond, etc.
+    ORNAMENT     = 0,  -- flowers, rocks, etc. Must be walkable.
 }
+-- set the enum values from 0 to powers of 2
+local exp = 0
+for block, _ in pairs(BF) do
+    BF[block] = 2 ^ exp
+    exp = exp + 1
+end
 
 -- FLAGS GET STRING NAME AS INPUT, NOT ID!!!
 local flags = {
-    air              = bit.bor(BF.WALKABLE, BF.LIGHT_SOURCE),
+    air              = bit.bor(BF.EMPTY, BF.WALKABLE, BF.LIGHT_SOURCE),
     torch            = BF.LIGHT_SOURCE,
     ["base-ore"]     = BF.ORE,
     ["red-poppy"]    = BF.ORNAMENT,

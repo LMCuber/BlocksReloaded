@@ -3,6 +3,7 @@ local Color = require("src.color")
 -- 
 local comp = require("src.components")
 local anim = require("src.animation")
+local blocks = require("src.blocks")
 
 -- constants
 BlockAction = {
@@ -10,20 +11,6 @@ BlockAction = {
     BREAK = 1,
     NONE = 2,
 }
-
--- events
-function love.mousepressed(mouse_x, mouse_y, button)
-    if button == 1 then
-        player.mouse_down = true
-        player.block_action = BlockAction.BREAK
-    end
-end
-
-function love.mousereleased(mouse_x, mouse_y, button)
-    if button == 1 then
-        player.mouse_down = false
-    end
-end
 
 -- player class
 local Direction = {
@@ -46,7 +33,7 @@ function Player:new(world)
         speed = 350,
         jump_buffer = 0.15,
         coyote = 0.1,
-        hitbox = comp.Hitbox:new(50, 70),
+        hitbox = comp.Hitbox:new(50, 76),
         mouse_down = false,
         block_action = BlockAction.NONE,
         direc = Direction.NONE,
@@ -74,6 +61,27 @@ function Player:process_keypress(key)
             -- save jump capture (buffer)
             self.jump_capture = love.timer.getTime()
         end
+    end
+end
+
+function Player:process_mousepressed(mouse_x, mouse_y, button)
+    if button == 1 then
+        self.mouse_down = true
+
+        local key, block_x, block_y = self.world:mouse_to_timbre(mouse_x, mouse_y, self.scroll)
+        local current = blocks.name[self.world:get(key, block_x, block_y)]
+
+        if current == nil or bwand(current, BF.EMPTY) then
+            self.block_action = BlockAction.PLACE
+        else
+            self.block_action = BlockAction.BREAK
+        end
+    end
+end
+
+function Player:process_mousereleased(mouse_x, mouse_y, button)
+    if button == 1 then
+        self.mouse_down = false
     end
 end
 
@@ -121,10 +129,14 @@ end
 
 function Player:interact(scroll)
     if self.mouse_down then
+        local mouse_x, mouse_y = love.mouse.getPosition()
+        local key, block_x, block_y = self.world:mouse_to_timbre(mouse_x, mouse_y, self.scroll)
+
         if self.block_action == BlockAction.BREAK then
-            local mx, my = love.mouse.getPosition()
-        local key, block_x, block_y = self.world:mouse_to_block(mx, my, scroll)
             self.world:break_(key, block_x, block_y)
+
+        elseif self.block_action == BlockAction.PLACE then
+            self.world:place(key, block_x, block_y, "torch")
         end
     end
 end

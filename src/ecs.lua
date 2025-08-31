@@ -30,7 +30,7 @@ function ecs:_get_components(chunk, ...)
     local comp_types = {...}
 
     local ret = {}
-    
+
     -- get all possible collection of entities (based on component type) before intersecting them
     local possible_entities = {}
 
@@ -96,7 +96,7 @@ function ecs:relocate_entity(ent_id, src_chunk, new_chunk_x, new_chunk_y)
     for _, comp_obj in pairs(entity_manager.entities[ent_id]) do
         table.insert(comp_objects, comp_obj)
     end
-    
+
     -- delete said entity
     ecs:delete_entity(ent_id, src_chunk)
 
@@ -112,7 +112,7 @@ function ecs:create_entity(chunk, ...)
     entity_manager.entities[ent_id] = {}
 
     for _, comp_obj in ipairs(comp_objects) do
-        comp_name = comp_obj._name
+        local comp_name = comp_obj._name
 
         if not component_manager.components[chunk] then
             component_manager.components[chunk] = {}

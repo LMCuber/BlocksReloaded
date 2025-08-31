@@ -3,6 +3,15 @@ local commons = {}
 -- globals (use sparingly, we do not want to pollute the global namespace)
 _G.GRAVITY = 2300
 
+function commons.key(cx, cy)
+    return cx .. "," .. cy
+end
+
+function commons.parse_key(key)
+    local cx, cy = key:match("(-?%d+),(-?%d+)")
+    return tonumber(cx), tonumber(cy)
+end
+
 function _G.test(...)
     print(love.math.random(0, 999), ...)
 end
@@ -101,15 +110,6 @@ function commons.remove_by_key(tbl, element)
             break
         end
     end
-end
-
-function commons.key(cx, cy)
-    return cx .. "," .. cy
-end
-
-function commons.parse_key(key)
-    local cx, cy = key:match("(-?%d+),(-?%d+)")
-    return tonumber(cx), tonumber(cy)
 end
 
 return commons

@@ -17,19 +17,30 @@ local MAX_LIGHT = 15
 World = {}
 World.__index = World
 
+--[[
+key = "1,0" (chunk key)
+chunk_pos = {1, 0}
+rel_x, rel_y = 1..CW, 1..CH
+pitch = rel_x, rel_y
+timbre = key, pitch
+]]
 function World:new()
     local obj = setmetatable({}, self)
 
     obj.data = {}
+    obj.bg_data = {}
     obj.lightmap = {}
     obj.light_surf = nil
+    obj.lighting = true
+
     obj.batch = love.graphics.newSpriteBatch(blocks.sprs, 1000)
     obj.bg_batch = love.graphics.newSpriteBatch(blocks.sprs, 1000)
-    obj.lighting = true
     obj.biome = biomes.Forest
+
     obj.x_seed = love.math.random()
     obj.y_seed = love.math.random()
     obj.processed_chunks = {}
+
     love.math.setRandomSeed(obj.x_seed)
 
     return obj
@@ -71,7 +82,9 @@ function World:create_chunk(cx, cy)
     -- initialize chunk metadata
     local key = commons.key(cx, cy)
     local chunk = {}
+    local bg_chunk = {}
     self.data[key] = chunk
+    self.bg_data[key] = bg_chunk
 
     -- get the biome from noise
     local biome = biomes.Forest
@@ -79,6 +92,7 @@ function World:create_chunk(cx, cy)
     for rel_x = 1, CW do
         -- initialize empty column
         chunk[rel_x] = {}
+        bg_chunk[rel_x] = {}
 
         -- get terrain height for this column from noise
         local block_x = cx * CW + (rel_x - 1)
@@ -89,15 +103,15 @@ function World:create_chunk(cx, cy)
         }) - 0.5) * 32)
         local dirt_height = ground_height + 16
 
-        local name
+        -- the final data that will be saved
+        -- EVERYTHING ABOVE SOIL LEVEL IS AIR
+        local name = "air"
+        local bg_name = "air"
 
         for rel_y = 1, CH do
             local block_y = cy * CH + (rel_y - 1)
 
-            if block_y < ground_height then
-                name = "air"
-
-            elseif block_y >= ground_height then
+            if block_y >= ground_height then
                 local noise = self:octave_noise({
                     x = block_x,
                     y = block_y,
@@ -110,20 +124,24 @@ function World:create_chunk(cx, cy)
                 if block_y <= dirt_height then
                     if block_y == ground_height then
                         name = biome.top
-                    else 
+                    else
                         name = biome.dirt
                     end
-
+                    bg_name = biome.dirt
                 else
                     if noise > 0.45 then
                         name = self:get_ore()
-                    else
-                        name = "stone|b"
                     end
+                    bg_name = "stone"
                 end
             end
 
-            self:set(key, rel_x, rel_y, name)
+            if name ~= nil then
+                self.data[key][rel_x][rel_y] = blocks.id[name]
+            end
+            if bg_name ~= nil then
+                self.bg_data[key][rel_x][rel_y] = blocks.id[bg_name]
+            end
 
         end
     end
@@ -149,7 +167,7 @@ function World:get(key, rel_x, rel_y)
 end
 
 function World:set(key, rel_x, rel_y, name, safe)
-    -- safe means doesn't create new chunks if it overflows
+    -- safe means doesn't create new chunks if it overflows. Default is false
     safe = safe or false
 
     -- Parse the current chunk key
@@ -308,26 +326,39 @@ function World:modify_chunk(key)
     return chunk
 end
 
-function World:get_tile_chunk(block_x, block_y)
+function World:abs_pos_to_chunk(block_x, block_y)
     local chunk_x = math.floor(block_x / CW)
     local chunk_y = math.floor(block_y / CH)
     return Vec2:new(chunk_x, chunk_y)
 end
 
-function World:get_tile(block_x, block_y, dont_create_if_empty)
+function World:abs_pos_to_tile(block_x, block_y, dont_create_if_empty)
     local chunk_x = math.floor(block_x / CW)
     local chunk_y = math.floor(block_y / CH)
     local key = commons.key(chunk_x, chunk_y)
     local chunk = self.data[key]
-    if not chunk and not dont_create_if_empty then 
+    if not chunk and not dont_create_if_empty then
         chunk = self:create_chunk(chunk_x, chunk_y)
     end
     local rel_x = (block_x % CW) + 1
     local rel_y = (block_y % CH) + 1
-    return (chunk[rel_x] and chunk[rel_x][rel_y]) or 0
+    return (chunk[rel_x] and chunk[rel_x][rel_y]) or nil
 end
 
-function World:mouse_to_block(mx, my, scroll)
+function World:abs_pos_to_bg_tile(block_x, block_y, dont_create_if_empty)
+    local chunk_x = math.floor(block_x / CW)
+    local chunk_y = math.floor(block_y / CH)
+    local key = commons.key(chunk_x, chunk_y)
+    local chunk = self.bg_data[key]
+    if not chunk and not dont_create_if_empty then
+        chunk = self:create_chunk(chunk_x, chunk_y)
+    end
+    local rel_x = (block_x % CW) + 1
+    local rel_y = (block_y % CH) + 1
+    return (chunk[rel_x] and chunk[rel_x][rel_y]) or nil
+end
+
+function World:mouse_to_timbre(mx, my, scroll)
     local block_x = math.floor((mx + scroll.x) / BS)
     local block_y = math.floor((my + scroll.y) / BS)
 
@@ -343,20 +374,24 @@ function World:mouse_to_block(mx, my, scroll)
 end
 
 function World:get_blocks_around_pos(x, y, o)
-    positions = {}
+    local positions = {}
     o = o or 3
     for yo = -o, o do
         for xo = -o, o do
             local tx = math.floor(x / BS) + xo
             local ty = math.floor(y / BS) + yo
-            local name = blocks.name[self:get_tile(tx, ty)]
+            local name = blocks.name[self:abs_pos_to_tile(tx, ty)]
 
-            if nbwand(name, BF.WALKABLE) then
+            if name ~= nil and nbwand(name, BF.WALKABLE) then
                 table.insert(positions, Vec2:new(tx * BS, ty * BS))
             end
         end
     end
     return positions
+end
+
+function World:place(key, block_x, block_y, name)
+    self.data[key][block_x][block_y] = blocks.id[name]
 end
 
 function World:break_(key, block_x, block_y)
@@ -395,8 +430,11 @@ function World:propagate_lighting(scroll)
     for ty = min_y, max_y do
         for tx = min_x, max_x do
             -- lighting stuff
-            local name = blocks.name[self:get_tile(tx, ty)]
-            if bwand(name, BF.LIGHT_SOURCE) then
+            local name = blocks.name[self:abs_pos_to_tile(tx, ty)]
+            local bg_name = blocks.name[self:abs_pos_to_bg_tile(tx, ty)]
+
+            -- propagate light if the block is a light source
+            if (name == "air" and bg_name == "air") or (name ~= "air" and bwand(name, BF.LIGHT_SOURCE)) then
                 self.lightmap[ty][tx] = MAX_LIGHT
                 tail = tail + 1
                 qx[tail], qy[tail], ql[tail] = tx, ty, MAX_LIGHT
@@ -406,9 +444,9 @@ function World:propagate_lighting(scroll)
 
             -- save the topleft and bottomright chunks
             if tx == min_x and ty == min_y then
-                chunk_topleft = self:get_tile_chunk(tx, ty)
+                chunk_topleft = self:abs_pos_to_chunk(tx, ty)
             elseif tx == max_x and ty == max_y then
-                chunk_bottomright = self:get_tile_chunk(tx, ty)
+                chunk_bottomright = self:abs_pos_to_chunk(tx, ty)
             end
 
         end
@@ -467,34 +505,39 @@ function World:draw(scroll)
 
     for ty = min_y, max_y do
         for tx = min_x, max_x do
-            local tile = self:get_tile(tx, ty)
+            -- get the (bg) tile and (bg) name of the block given absolute coordinates
+            local tile = self:abs_pos_to_tile(tx, ty)
+            local bg_tile = self:abs_pos_to_bg_tile(tx, ty)
             local name = blocks.name[tile]
+            local bg_name = blocks.name[bg_tile]
+
+            -- get light value
             local light = (self.lightmap[ty] and self.lightmap[ty][tx]) or 0
+            local norm_light = light / MAX_LIGHT
+ 
+            -- if there is foreground, draw that. Else, if background, draw that
+            if tile ~= nil and name ~= "air" then
+                self.batch:add(blocks.quads[tile], tx * BS, ty * BS, 0, S, S)
+            elseif bg_tile ~= nil and bg_name ~= "air" then
+                self.bg_batch:add(blocks.quads[bg_tile], tx * BS, ty * BS, 0, S, S)
+            end
 
-            if name ~= "air" then
-                -- normal tile
-                local base = 0.36
-                -- light = math.min(light + 1, MAX_LIGHT)
-                local l = light / MAX_LIGHT
+            -- if the block is not light, make it darker according to the calculated darkness
+            -- if not (name == "air" and bg_name) then
+            --     light = math.min(light + 1, MAX_LIGHT)
+                -- table.insert(prints, {light or 0, tx * BS, ty * BS})
+            -- end
 
-                -- check if it's bg block to add to correct batch
-                base, mods = norm(name)
-
-                if commons.contains(mods, "b") then
-                    self.bg_batch:add(blocks.quads[blocks.id[base]], tx * BS, ty * BS, 0, S, S)
-                else
-                    self.batch:add(blocks.quads[tile], tx * BS, ty * BS, 0, S, S)
-                end
-
-                -- add lighting to the mix
+            -- only overlay block with darkness if block itself is not a light source
+            if nbwand(name, BF.LIGHT_SOURCE) or (name == "air" and bg_name ~= "air") then
                 if self.lighting then
                     self.light_surf:setPixel(
                         tx - min_x, ty - min_y,
-                        0, 0, 0, 1 - l
+                        0, 0, 0, 1 - norm_light
                     )
                 end
-                -- table.insert(prints, {light or 0, tx * BS, ty * BS})
             end
+            -- table.insert(prints, {light or 0, tx * BS, ty * BS})
 
             -- calculate the lighting offset
             if tx == min_x and ty == min_y then
@@ -514,11 +557,11 @@ function World:draw(scroll)
     love.graphics.setColor(Color.WHITE)
 
     -- debugging
-    -- love.graphics.setColor(1, 0.8, 0.75, 1)
-    -- love.graphics.setFont(fonts.orbitron[12])
-    -- for _, x in ipairs(prints) do
-    --     love.graphics.print(x[1], x[2], x[3])
-    -- end
+    love.graphics.setColor(1, 0.8, 0.75, 1)
+    love.graphics.setFont(fonts.orbitron[12])
+    for _, x in ipairs(prints) do
+        love.graphics.print(x[1], x[2], x[3])
+    end
 
     if self.lighting then
         self.light_surf = love.graphics.newImage(self.light_surf)
