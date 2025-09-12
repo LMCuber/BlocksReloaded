@@ -1,6 +1,7 @@
 local Player = require("src.player")
 local Color = require("src.color")
 local Vec2 = require("src.vec2")
+local Model = require("src.3d_model");
 -- 
 local world = require("src.world")
 local fonts = require("src.fonts")
@@ -10,10 +11,15 @@ local shader = require("src.shader")
 local fake_scroll = Vec2:new(0, 0)
 local scroll = Vec2:new(0, 0)
 
+-- dependency injection
 local player = Player:new(world)
 player.scroll = scroll
+world.player = player
 
+-- global objects
+local model = Model:new()
 
+-- globals
 local debug_rects = {}
 
 -- functions
@@ -70,7 +76,7 @@ function love.draw()
 
     -- update the main components: world and player
     local num_rendered_entities = world:draw(scroll)
-    player:draw(scroll)
+    -- player:draw(scroll)
 
     -- debug hitboxes
     for _, rect in ipairs(debug_rects) do

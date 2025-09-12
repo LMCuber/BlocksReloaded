@@ -14,7 +14,7 @@ local VIEW_PADDING = 2
 local MAX_LIGHT = 15
 
 -- WORLD CLASS
-World = {}
+local World = {}
 World.__index = World
 
 --[[
@@ -549,10 +549,12 @@ function World:draw(scroll)
         end
     end
 
+    self.player:draw(scroll)
+
     -- B L O C K  L I G H T I N G
     love.graphics.draw(self.batch)
-    local darkness = 0.5
-    love.graphics.setColor(darkness, darkness, darkness, 1)
+    local bg_light_mult = 0.5
+    love.graphics.setColor(bg_light_mult, bg_light_mult, bg_light_mult, 1)
     love.graphics.draw(self.bg_batch)
     love.graphics.setColor(Color.WHITE)
 
