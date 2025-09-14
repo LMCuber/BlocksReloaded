@@ -1,6 +1,7 @@
 local Player = require("src.player")
 local Color = require("src.color")
 local Vec2 = require("src.vec2")
+local Vec3 = require("src.vec3")
 local Model = require("src.3d_model");
 -- 
 local world = require("src.world")
@@ -17,7 +18,13 @@ player.scroll = scroll
 world.player = player
 
 -- global objects
-local model = Model:new()
+local model = Model:new({
+        obj_file = "res/models/gun.obj",
+        center = Vec2:new(WIDTH / 2, HEIGHT / 2),
+        size = 15,
+        avel = Vec3:new(3, 2, 2);
+    }
+)
 
 -- globals
 local debug_rects = {}
@@ -65,6 +72,8 @@ function love.update(dt)
     local processed_chunks = world:update(dt, scroll)
     player:update(dt, scroll)
 
+    model:update()
+
     systems.relocate:process(processed_chunks)
     debug_rects = systems.physics:process(processed_chunks)
 end
@@ -85,6 +94,9 @@ function love.draw()
     end
 
     love.graphics.pop()
+
+    -- update misc objects
+    model:draw()
 
     -- FPS, debug, etc.
     love.graphics.setColor(Color.ORANGE)

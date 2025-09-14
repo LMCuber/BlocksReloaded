@@ -2,6 +2,7 @@ local commons = {}
 
 -- globals (use sparingly, we do not want to pollute the global namespace)
 _G.GRAVITY = 2300
+_G.WIDTH, _G.HEIGHT = love.graphics.getDimensions()
 
 function commons.key(cx, cy)
     return cx .. "," .. cy
@@ -67,6 +68,14 @@ function commons.intersect_n(...)
     return result
 end
 
+function commons.rand_rgb()
+    local color = {}
+    for _ = 1, 3 do
+        table.insert(color, love.math.random())
+    end
+    return color
+end
+
 function commons.unpack(t, i)
     i = i or 1
     if t[i] == nil then return end
@@ -80,18 +89,14 @@ function commons.extend(t1, t2)
 end
 
 function commons.split(str, sep)
-    local first, rest = str:match("([^" .. sep .. "]+)" .. sep .. "(.+)")
-    if not first then
-        -- no separator found, return string and empty table
-        return str, {}
-    end
-    
     local result = {}
-    for part in string.gmatch(rest, "([^" .. sep .. "]+)") do
-        table.insert(result, part)
+    local pattern = "([^" .. sep .. "]+)"
+    
+    for match in string.gmatch(str, pattern) do
+        table.insert(result, match)
     end
     
-    return first, result
+    return result
 end
 
 function commons.contains(tbl, element)
@@ -110,6 +115,26 @@ function commons.remove_by_key(tbl, element)
             break
         end
     end
+end
+
+function commons.startswith(str, prefix)
+    return str:sub(1, #prefix) == prefix
+end
+
+function commons.map(tbl, func)
+    local result = {}
+    for i, v in ipairs(tbl) do
+        result[i] = func(v)
+    end
+    return result
+end
+
+function commons.sum(tbl)
+    local total = 0
+    for _, value in ipairs(tbl) do
+        total = total + value
+    end
+    return total
 end
 
 return commons

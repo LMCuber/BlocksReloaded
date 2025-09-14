@@ -23,8 +23,8 @@ function Transform:new(pos, vel, gravity, sines, rot, rot_vel)
 
     if obj.sines.x ~= 0 or obj.sines.y ~= 0 then
         obj.sine_offsets = Vec2:new(
-            math.random() * 2 * math.pi,
-            math.random() * 2 * math.pi
+            love.math.random() * 2 * math.pi,
+            love.math.random() * 2 * math.pi
         )
     end
     
