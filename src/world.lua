@@ -166,9 +166,9 @@ function World:get(key, rel_x, rel_y)
     return nil
 end
 
-function World:set(key, rel_x, rel_y, name, safe)
-    -- safe means doesn't create new chunks if it overflows. Default is false
-    safe = safe or false
+function World:set(key, rel_x, rel_y, name, safe, is_bg)
+    safe = safe or false  -- safe means doesn't create new chunks if it overflows. Default is false
+    is_bg = is_bg or false  -- to change the bg tile instead of the foreground tile. Previously was "|b"
 
     -- Parse the current chunk key
     local cx, cy = key:match("(-?%d+),(-?%d+)")
@@ -201,6 +201,7 @@ function World:set(key, rel_x, rel_y, name, safe)
         ny = ny - chunk_offset * CH
     end
 
+    -- generate key by concatenating
     nkey = cx .. "," .. cy
 
     -- Ensure the tables exist
@@ -209,7 +210,11 @@ function World:set(key, rel_x, rel_y, name, safe)
     end
 
     -- Assign the block
-    self.data[nkey][nx][ny] = blocks.id[name]
+    if is_bg then
+        self.bg_data[nkey][nx][ny] = blocks.id[name]
+    else
+        self.data[nkey][nx][ny] = blocks.id[name]
+    end
 end
 
 function World:modify_chunk(key)
@@ -264,7 +269,7 @@ function World:modify_chunk(key)
                 end
 
                 -- pyramid
-                if chance(1 / 100) then
+                if chance(1 / 40) then
                     local pyr_height = love.math.random(6, 20)
                     local pyr_offset = love.math.random(1, pyr_height / 4)
                     for yo = 0, pyr_height do
@@ -274,7 +279,7 @@ function World:modify_chunk(key)
                                 self:set(key, x + xo, y - pyr_offset + yo, "sand")
                             else
                                 -- inside of the pyramid
-                                self:set(key, x + xo, y - pyr_offset + yo, "sand|b")
+                                self:set(key, x + xo, y - pyr_offset + yo, "sand", false, true)
                             end
                             -- hidden chest!
                             if yo == pyr_height - 1 and xo == 0 then
@@ -517,6 +522,9 @@ function World:draw(scroll)
  
             -- if there is foreground, draw that. Else, if background, draw that
             if tile ~= nil and name ~= "air" then
+                if blocks.quads[tile] == nil then
+                    print("NIL", tile, bg_tile, name, bg_name)
+                end
                 self.batch:add(blocks.quads[tile], tx * BS, ty * BS, 0, S, S)
             elseif bg_tile ~= nil and bg_name ~= "air" then
                 self.bg_batch:add(blocks.quads[bg_tile], tx * BS, ty * BS, 0, S, S)

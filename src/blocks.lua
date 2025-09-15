@@ -28,7 +28,7 @@ end
 -- FLAGS GET STRING NAME AS INPUT, NOT ID!!!
 local flags = {
     air              = bit.bor(BF.EMPTY, BF.WALKABLE, BF.LIGHT_SOURCE),
-    torch            = BF.LIGHT_SOURCE,
+    torch            = bit.bor(BF.LIGHT_SOURCE, BF.WALKABLE),
     ["base-ore"]     = BF.ORE,
     ["red-poppy"]    = BF.ORNAMENT,
     ["yellow-poppy"] = BF.ORNAMENT,

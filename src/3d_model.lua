@@ -7,6 +7,7 @@ local commons = require("src.commons")
 local Model = {}
 Model.__index = Model
 
+-- GPT CODE: NOT TESTED !!!
 local function polygon_winding(points)
     local n = #points
     local area = 0
@@ -78,6 +79,7 @@ local function v_dot_v(v1, v2)
     return result
 end
 
+-- MY CODE
 local function get_rotation_matrix_x(a)
     return {
         {1, 0, 0},
@@ -113,7 +115,7 @@ function Model:new(kwargs)
     local obj = setmetatable({}, self)
 
     -- mandatory arguments
-    obj.obj_file = kwargs.obj_file
+    obj.obj_path = kwargs.obj_path
     obj.center = kwargs.center
     obj.size = kwargs.size
 
@@ -123,40 +125,26 @@ function Model:new(kwargs)
     obj.angle = kwargs.angle or Vec3:new(0.0, 0.0, 0.0)
     obj.avel = kwargs.avel or Vec3:new(2.0, 2.0, 2.0)
 
-    obj.vertices = {
-        {  1,  1,  1 },
-        {  1,  1, -1 },
-        {  1, -1,  1 },
-        {  1, -1, -1 },
-        { -1,  1,  1 },
-        { -1,  1, -1 },
-        { -1, -1,  1 },
-        { -1, -1, -1 },
-    }
+    -- material attributes
+    obj.materials = {}
 
-    obj.faces = {
-        {{1, 3, 4, 2}, {commons.rand_rgb(), Color.BLACK}}, -- Right face (+X) - already CW
-        {{5, 6, 8, 7}, {commons.rand_rgb(), Color.BLACK}}, -- Left face (-X) - reversed
-        {{1, 2, 6, 5}, {commons.rand_rgb(), Color.BLACK}}, -- Top face (+Y) - already CW  
-        {{3, 7, 8, 4}, {commons.rand_rgb(), Color.BLACK}}, -- Bottom face (-Y) - already CW
-        {{1, 5, 7, 3}, {commons.rand_rgb(), Color.BLACK}}, -- Front face (+Z) - already CW
-        {{2, 4, 8, 6}, {commons.rand_rgb(), Color.BLACK}}, -- Back face (-Z) - already CW
-    }
-
-    obj:load_model()
-
+    -- geometry attributes
     obj.draw_vertices = {}
-    self.updated_normals = {}
+    obj.updated_normals = {}
+    obj:load_obj()
 
     return obj
 end
 
-function Model:load_model()
-    self.vertices = {}
-    self.normals = {}
-    self.faces = {}
+function Model:load_mtl(mtl_file)
+    -- derive the file path to the material path relative to the object path
+    local obj_path = commons.split(self.obj_path, "/")
+    obj_path[#obj_path] = mtl_file
+    local mtl_path = table.concat(obj_path, "/")
 
-    for line in love.filesystem.lines(self.obj_file) do
+    self.materials[mtl_path] = {}
+    local current_mtl = nil
+    for line in love.filesystem.lines(mtl_path) do
         -- ignore comments
         if commons.startswith(line, "#") then
             goto continue
@@ -165,9 +153,52 @@ function Model:load_model()
         -- split line into args
         local args = commons.split(line, " ")
 
-        -- skip extra stuff
-        if args[1] == "mtllib" or args[1] == "o" then
+        -- capture start of new material
+        if args[1] == "newmtl" then
+            current_mtl = args[2]
+            self.materials[mtl_path][current_mtl] = {}
+        end
+
+        -- get diffuse color
+        if args[1] == "Kd" then
+            local color = {
+                tonumber(args[2]),
+                tonumber(args[3]),
+                tonumber(args[4]),
+            }
+            self.materials[mtl_path][current_mtl]["Kd"] = color
+        end
+
+        ::continue::
+    end
+
+    return mtl_path
+end
+
+function Model:load_obj()
+    self.vertices = {}
+    self.normals = {}
+    self.faces = {}
+
+    local current_mtl_path = nil
+    local current_mtl = nil
+    for line in love.filesystem.lines(self.obj_path) do
+        -- ignore comments
+        if commons.startswith(line, "#") then
             goto continue
+        end
+
+        -- split line into args
+        local args = commons.split(line, " ")
+
+        -- load material file
+        if args[1] == "mtllib" then
+            current_mtl_path = self:load_mtl(args[2])
+        end
+
+        -- select specific material from the previously loaded file
+        if args[1] == "usemtl" then
+            current_mtl = args[2]
         end
 
         -- parse vertices
@@ -203,10 +234,45 @@ function Model:load_model()
                     table.insert(vert_indices, vert_index)
                 end
             end
-            table.insert(self.faces, {vert_indices, norm_index, {Color.RED}})
+            -- check whether the material file had a material in it
+            local mtl_color
+            if current_mtl == nil then
+                -- default gray with black outline
+                table.insert(self.faces, {vert_indices, norm_index, {Color.LIGHT_GRAY, Color.BLACK}})
+            else
+                -- material albedo
+                mtl_color = self.materials[current_mtl_path][current_mtl]["Kd"]
+                table.insert(self.faces, {vert_indices, norm_index, {mtl_color}})
+            end
         end
 
         ::continue::
+    end
+end
+
+function Model:update()
+    -- step the position with velocity
+    self.angle = self.angle + self.avel * dt
+
+    -- update the vertex positions
+    local total_matrix = m_dot_m(
+        get_rotation_matrix_z(self.angle.z),
+        m_dot_m(get_rotation_matrix_x(self.angle.x), get_rotation_matrix_y(self.angle.y))
+    )
+
+    -- transform the 3d vectors to 2d positions using rotation and projection matrices
+    self.draw_vertices = {}
+    self.updated_normals = {}
+    for _, vertex in ipairs(self.vertices) do
+        local new_vertex = m_dot_v(total_matrix, vertex)
+        local ortho_vertex = m_dot_v(orthogonal_projection_matrix, new_vertex)
+        table.insert(self.draw_vertices, {ortho_vertex[1], ortho_vertex[2]})
+    end
+
+    -- transform face normals as well
+    for _, normal in ipairs(self.normals) do
+        local new_normal = m_dot_v(total_matrix, normal)
+        table.insert(self.updated_normals, new_normal)
     end
 end
 
@@ -226,24 +292,39 @@ function Model:draw()
         local face_colors = face_data[3]  -- {fcolor, lcolor}
 
         -- change color based on normal
-        local normal = self.updated_normals[norm_index]
-        local dot = v_dot_v(normal, self.light)
-        local light_intensity = (dot + 1) / 2
-        local fill_color = commons.map(face_colors[1], function(x) return light_intensity * x end)  -- fcolor
-        local line_color
-        if face_colors[2] ~= nil then
-            line_color = commons.map(face_colors[2], function(x) return light_intensity * x end)  -- lcolor
-        else
-            line_color = nil
-        end
+        local fill_color = face_colors[1]
+        local line_color = face_colors[2]
 
+        -- check if current normal from index exists (for some reason some model's don't fix their normals)
+        if self.updated_normals[norm_index] ~= nil then
+            -- there is a given surface normal so calculate light
+            local normal = self.updated_normals[norm_index]
+            local dot = v_dot_v(normal, self.light)
+            local light_intensity = (dot + 1) / 2
+            
+            fill_color = commons.map(fill_color, function(x) return light_intensity * x end)  -- lcolor
+            -- check if line color exists, if not, don't render it
+            if face_colors[2] ~= nil then
+                line_color = commons.map(line_color, function(x) return light_intensity * x end)  -- lcolor
+            else
+                line_color = nil
+            end
+        else
+            -- no normal, so just albedo (boring)
+            if face_colors[2] ~= nil then
+                line_color = face_colors[2]
+            else
+                line_color = nil
+            end
+        end
+        
         -- accumulate draw vertex data for the polygon
         local vertices = {}
         for _, vert_index in ipairs(face_indices) do
             -- vert_index: 1, 4, 6, etc.
             local vertex = self.draw_vertices[vert_index]  -- e.g. {-0.21, 0.34}
-            local draw_x = self.center.x + vertex[1] * self.size
-            local draw_y = self.center.y + vertex[2] * self.size
+            local draw_x = self.center.x + vertex[1] * self.size  -- pixel coords
+            local draw_y = self.center.y + vertex[2] * self.size  -- pixel coords
             table.insert(vertices, draw_x)
             table.insert(vertices, draw_y)
         end
@@ -251,6 +332,7 @@ function Model:draw()
         -- check if face vertices have correct winding (to backface cull)
         local winding = polygon_winding(vertices)
         if winding > 0 then
+            -- clockwise, so render
             love.graphics.setColor(fill_color)
             love.graphics.polygon("fill", vertices)
             if line_color ~= nil then
@@ -258,32 +340,6 @@ function Model:draw()
                 love.graphics.polygon("line", vertices)
             end
         end
-    end
-end
-
-function Model:update()
-    -- step the position with velocity
-    self.angle = self.angle + self.avel * dt
-
-    -- update the vertex positions
-    local total_matrix = m_dot_m(
-        get_rotation_matrix_z(self.angle.z),
-        m_dot_m(get_rotation_matrix_x(self.angle.x), get_rotation_matrix_y(self.angle.y))
-    )
-
-    -- transform the 3d vectors to 2d positions using rotation and projection matrices
-    self.draw_vertices = {}
-    self.updated_normals = {}
-    for i, vertex in ipairs(self.vertices) do
-        local new_vertex = m_dot_v(total_matrix, vertex)
-        local ortho_vertex = m_dot_v(orthogonal_projection_matrix, new_vertex)
-        table.insert(self.draw_vertices, {ortho_vertex[1], ortho_vertex[2]})
-    end
-
-    -- transform face normals as well
-    for i, normal in ipairs(self.normals) do
-        local new_normal = m_dot_v(total_matrix, normal)
-        table.insert(self.updated_normals, new_normal)
     end
 end
 
