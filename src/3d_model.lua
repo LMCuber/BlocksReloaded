@@ -7,7 +7,18 @@ local commons = require("src.commons")
 local Model = {}
 Model.__index = Model
 
--- GPT CODE: NOT TESTED !!!
+-- LLM CODE - NOT UNIT TESTED !!!
+local function centroid(points)
+    local sumx, sumy, sumz = 0, 0, 0
+    for _, p in ipairs(points) do
+        sumx = sumx + p[1]
+        sumy = sumy + p[2]
+        sumz = sumz + p[3]
+    end
+    local n = #points
+    return {sumx / n, sumy / n, sumz / n}
+end
+
 local function polygon_winding(points)
     local n = #points
     local area = 0
@@ -120,8 +131,8 @@ function Model:new(kwargs)
     obj.size = kwargs.size
 
     -- optional arguments
-    obj.light = kwargs.light or {0, 1, 1}
-    obj.light = commons.map(obj.light, function (x) return -x / commons.sum(obj.light) end)  -- invert light and normalize
+    obj.light = kwargs.light or {0, -1, 1}
+    -- obj.light = commons.map(obj.light, function (x) return -x / commons.length(obj.light) end)
     obj.angle = kwargs.angle or Vec3:new(0.0, 0.0, 0.0)
     obj.avel = kwargs.avel or Vec3:new(2.0, 2.0, 2.0)
 
@@ -129,7 +140,7 @@ function Model:new(kwargs)
     obj.materials = {}
 
     -- geometry attributes
-    obj.draw_vertices = {}
+    obj.updated_vertices = {}
     obj.updated_normals = {}
     obj:load_obj()
 
@@ -261,15 +272,33 @@ function Model:update()
     )
 
     -- transform the 3d vectors to 2d positions using rotation and projection matrices
-    self.draw_vertices = {}
-    self.updated_normals = {}
+    self.updated_vertices = {}
     for _, vertex in ipairs(self.vertices) do
         local new_vertex = m_dot_v(total_matrix, vertex)
-        local ortho_vertex = m_dot_v(orthogonal_projection_matrix, new_vertex)
-        table.insert(self.draw_vertices, {ortho_vertex[1], ortho_vertex[2]})
+        -- local ortho_vertex = m_dot_v(orthogonal_projection_matrix, new_vertex)
+        table.insert(self.updated_vertices, new_vertex)
     end
 
+    -- sort the faces based on the centroid of the corresponding vertex, given the vertex indices
+    -- FORMAT: {{vi1, v2, vi3}, ni, {fcolor, lcolor}}
+    table.sort(self.faces, function(fda, fdb)
+        local ia = {fda[1][1], fda[1][2], fda[1][3]}
+        local ca = centroid({
+            self.updated_vertices[ia[1]],
+            self.updated_vertices[ia[2]],
+            self.updated_vertices[ia[3]],
+        })
+        local ib = {fdb[1][1], fdb[1][2], fdb[1][3]}
+        local cb = centroid({
+            self.updated_vertices[ib[1]],
+            self.updated_vertices[ib[2]],
+            self.updated_vertices[ib[3]],
+        })
+        return ca[3] < cb[3]
+    end)
+
     -- transform face normals as well
+    self.updated_normals = {}
     for _, normal in ipairs(self.normals) do
         local new_normal = m_dot_v(total_matrix, normal)
         table.insert(self.updated_normals, new_normal)
@@ -278,7 +307,7 @@ end
 
 function Model:draw()
     love.graphics.setColor(Color.RED)
-    -- for _, vertex in ipairs(self.draw_vertices) do
+    -- for _, vertex in ipairs(self.updated_vertices) do
     --     local draw_x = self.center.x + vertex[1] * self.size
     --     local draw_y = self.center.y + vertex[2] * self.size
     --     love.graphics.circle("fill", draw_x, draw_y, 5)
@@ -301,7 +330,7 @@ function Model:draw()
             local normal = self.updated_normals[norm_index]
             local dot = v_dot_v(normal, self.light)
             local light_intensity = (dot + 1) / 2
-            
+
             fill_color = commons.map(fill_color, function(x) return light_intensity * x end)  -- lcolor
             -- check if line color exists, if not, don't render it
             if face_colors[2] ~= nil then
@@ -322,7 +351,7 @@ function Model:draw()
         local vertices = {}
         for _, vert_index in ipairs(face_indices) do
             -- vert_index: 1, 4, 6, etc.
-            local vertex = self.draw_vertices[vert_index]  -- e.g. {-0.21, 0.34}
+            local vertex = self.updated_vertices[vert_index]  -- e.g. {-0.21, 0.34}
             local draw_x = self.center.x + vertex[1] * self.size  -- pixel coords
             local draw_y = self.center.y + vertex[2] * self.size  -- pixel coords
             table.insert(vertices, draw_x)

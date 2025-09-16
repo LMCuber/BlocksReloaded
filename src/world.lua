@@ -279,6 +279,7 @@ function World:modify_chunk(key)
                                 self:set(key, x + xo, y - pyr_offset + yo, "sand")
                             else
                                 -- inside of the pyramid
+                                self:set(key, x + xo, y - pyr_offset + yo, "air")
                                 self:set(key, x + xo, y - pyr_offset + yo, "sand", false, true)
                             end
                             -- hidden chest!

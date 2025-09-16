@@ -19,10 +19,10 @@ world.player = player
 
 -- global objects
 local model = Model:new({
-        obj_path = "res/models/bracelet.obj",
+        obj_path = "res/models/sphere.obj",
         center = Vec2:new(WIDTH / 2, HEIGHT / 2),
-        size = 24,
-        avel = Vec3:new(1, 1, 1);
+        size = 70,
+        avel = Vec3:new(0, 0.2, 0);
     }
 )
 
