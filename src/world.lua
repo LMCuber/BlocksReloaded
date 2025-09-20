@@ -523,9 +523,6 @@ function World:draw(scroll)
  
             -- if there is foreground, draw that. Else, if background, draw that
             if tile ~= nil and name ~= "air" then
-                if blocks.quads[tile] == nil then
-                    print("NIL", tile, bg_tile, name, bg_name)
-                end
                 self.batch:add(blocks.quads[tile], tx * BS, ty * BS, 0, S, S)
             elseif bg_tile ~= nil and bg_name ~= "air" then
                 self.bg_batch:add(blocks.quads[bg_tile], tx * BS, ty * BS, 0, S, S)
