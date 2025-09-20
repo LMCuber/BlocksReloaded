@@ -21,8 +21,13 @@ world.player = player
 local model = Model:new({
         obj_path = "res/models/sphere.obj",
         center = Vec2:new(WIDTH / 2, HEIGHT / 2),
+<<<<<<< HEAD
         size = 20,
         avel = Vec3:new(0.7, 0.7, 0.7);
+=======
+        size = 100,
+        avel = Vec3:new(1, 1, 1);
+>>>>>>> c6707efd2d98f5e9725674f135441daf833eaf83
     }
 )
 
@@ -72,7 +77,7 @@ function love.update(dt)
     local processed_chunks = world:update(dt, scroll)
     player:update(dt, scroll)
 
-    model:update()
+    -- model:update()
 
     systems.relocate:process(processed_chunks)
     debug_rects = systems.physics:process(processed_chunks)
@@ -96,7 +101,7 @@ function love.draw()
     love.graphics.pop()
 
     -- update misc objects
-    model:draw()
+    -- model:draw()
 
     -- FPS, debug, etc.
     love.graphics.setColor(Color.ORANGE)

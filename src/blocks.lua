@@ -52,9 +52,9 @@ function _G.nbwand(name, flag)
     return bit.band(flags[name] or 0, flag) == 0
 end
 
-function _G.norm(name)
-    local base, mods = commons.split(name, "|")
-    return base, mods
+function _G.pure(name)
+    local base, var = commons.split(name, "_")
+    return base, var
 end
 
 -- block image loading
@@ -108,6 +108,10 @@ for y, layer in ipairs(block_list) do
         -- bg flags
         flags[name] = flags[name] or BF.NONE
         flags[name .. "|b"] = bit.bor(flags[name], BF.WALKABLE)
+
+        -- special flags
+        local base, var = pure(name)
+        
 
         -- next iteration
         id = id + 1
