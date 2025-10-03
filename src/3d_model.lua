@@ -135,6 +135,7 @@ function Model:new(kwargs)
     -- obj.light = commons.map(obj.light, function (x) return -x / commons.length(obj.light) end)
     obj.angle = kwargs.angle or Vec3:new(0.0, 0.0, 0.0)
     obj.avel = kwargs.avel or Vec3:new(2.0, 2.0, 2.0)
+    obj.kwargs = kwargs
 
     -- material attributes
     obj.materials = {}
@@ -190,6 +191,7 @@ function Model:load_obj()
     self.vertices = {}
     self.normals = {}
     self.faces = {}
+    self.lines = {}
 
     local current_mtl_path = nil
     local current_mtl = nil
@@ -257,6 +259,14 @@ function Model:load_obj()
             end
         end
 
+        if args[1] == "l" then
+            local vert_indices = {
+                tonumber(args[2]),
+                tonumber(args[3]),
+            }
+            table.insert(self.lines, vert_indices)
+        end
+
         ::continue::
     end
 end
@@ -297,7 +307,20 @@ function Model:update()
         return ca[3] < cb[3]
     end)
 
-    -- transform face normals as well
+    -- sort the lines the same fashion as the faces.
+    table.sort(self.lines, function(ia, ib)
+        local ca = centroid({
+            self.updated_vertices[ia[1]],
+            self.updated_vertices[ia[2]],
+        })
+        local cb = centroid({
+            self.updated_vertices[ib[1]],
+            self.updated_vertices[ib[2]],
+        })
+        return ca[3] < cb[3]
+    end)
+
+    -- transform normals (just like we did the vertices)
     self.updated_normals = {}
     for _, normal in ipairs(self.normals) do
         local new_normal = m_dot_v(total_matrix, normal)
@@ -306,12 +329,13 @@ function Model:update()
 end
 
 function Model:draw()
-    love.graphics.setColor(Color.RED)
-    -- for _, vertex in ipairs(self.updated_vertices) do
-    --     local draw_x = self.center.x + vertex[1] * self.size
-    --     local draw_y = self.center.y + vertex[2] * self.size
-    --     love.graphics.circle("fill", draw_x, draw_y, 5)
-    -- end
+    self.draw_vertices = {}
+    -- transform all updated vertices to drawable pixel coordinates
+    for _, vertex in ipairs(self.updated_vertices) do
+        local draw_x = self.center.x + vertex[1] * self.size
+        local draw_y = self.center.y + vertex[2] * self.size
+        table.insert(self.draw_vertices, {draw_x, draw_y})
+    end
 
     for _, face_data in ipairs(self.faces) do
         -- FORMAT: {{vi1, v2, vi3}, ni, {fcolor, lcolor}}
@@ -346,16 +370,14 @@ function Model:draw()
                 line_color = nil
             end
         end
-        
-        -- accumulate draw vertex data for the polygon
+
+        -- accumulate draw vertex data for the polygon in a callable argument format:
+        -- x1, y2, x2, y2, x3, y3, ..., xn, yn
         local vertices = {}
         for _, vert_index in ipairs(face_indices) do
-            -- vert_index: 1, 4, 6, etc.
-            local vertex = self.updated_vertices[vert_index]  -- e.g. {-0.21, 0.34}
-            local draw_x = self.center.x + vertex[1] * self.size  -- pixel coords
-            local draw_y = self.center.y + vertex[2] * self.size  -- pixel coords
-            table.insert(vertices, draw_x)
-            table.insert(vertices, draw_y)
+            local draw_pos = self.draw_vertices[vert_index]
+            table.insert(vertices, draw_pos[1])
+            table.insert(vertices, draw_pos[2])
         end
 
         -- check if face vertices have correct winding (to backface cull)
@@ -369,6 +391,24 @@ function Model:draw()
                 love.graphics.polygon("line", vertices)
             end
         end
+    end
+
+    if self.kwargs.points then
+        -- draw circles at vertices
+        love.graphics.setColor(Color.RED)
+        for _, vertex in ipairs(self.updated_vertices) do
+            local draw_x = self.center.x + vertex[1] * self.size
+            local draw_y = self.center.y + vertex[2] * self.size
+            love.graphics.circle("fill", draw_x, draw_y, 12)
+        end
+    end
+
+    for _, vert_indices in ipairs(self.lines) do
+        local p1 = self.draw_vertices[vert_indices[1]]
+        local p2 = self.draw_vertices[vert_indices[2]]
+        love.graphics.setColor(Color.ORANGE)
+        love.graphics.line(p1[1], p1[2], p2[1], p2[2])
+        love.graphics.setColor(Color.WHITE)
     end
 end
 

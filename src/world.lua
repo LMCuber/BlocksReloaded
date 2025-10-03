@@ -17,21 +17,23 @@ local MAX_LIGHT = 15
 local World = {}
 World.__index = World
 
---[[
-key = "1,0" (chunk key)
-chunk_pos = {1, 0}
-rel_x, rel_y = 1..CW, 1..CH
-pitch = rel_x, rel_y
-timbre = key, pitch
+--[[\
+    key = "1,0" (chunk key)
+    chunk_pos = {1, 0}
+    rel_x, rel_y = 1..CW, 1..CH
+    pitch = rel_x, rel_y
+    timbre = key, pitch
 ]]
 function World:new()
     local obj = setmetatable({}, self)
+
+    obj.player = nil
 
     obj.data = {}
     obj.bg_data = {}
     obj.lightmap = {}
     obj.light_surf = nil
-    obj.lighting = true
+    obj.lighting = false
 
     obj.batch = love.graphics.newSpriteBatch(blocks.sprs, 1000)
     obj.bg_batch = love.graphics.newSpriteBatch(blocks.sprs, 1000)
@@ -205,6 +207,11 @@ function World:set(key, rel_x, rel_y, name, safe, is_bg)
     nkey = cx .. "," .. cy
 
     -- Ensure the tables exist
+    -- local n = 0
+    -- for k, v in pairs(self.data) do
+    --     n = n + 1
+    -- end
+    -- print(n)
     if not self.data[nkey] then
         self:create_chunk(cx, cy)
     end
@@ -291,8 +298,7 @@ function World:modify_chunk(key)
                 end
 
                 -- entities
-                if chance(1 / 5)
-                        then
+                if chance(1 / 16) then
                     for i = 1, 1 do
                         ecs:create_entity(
                             key,
@@ -412,6 +418,8 @@ function World:update(dt, scroll)
 end
 
 function World:propagate_lighting(scroll)
+    bench:start(Color.YELLOW)
+
     -- determine bounds
     local min_x = math.floor(scroll.x / BS) - VIEW_PADDING
     local max_x = math.floor((scroll.x + WIDTH) / BS) + VIEW_PADDING
@@ -487,11 +495,15 @@ function World:propagate_lighting(scroll)
         end
     end
 
+    bench:finish(Color.YELLOW)
+
     -- return the processed chunks
     return self.processed_chunks
 end
 
 function World:draw(scroll)
+    bench:start(Color.LIME)
+
     -- B L O C K S
     local min_x = math.floor(scroll.x / BS)
     local max_x = math.floor((scroll.x + WIDTH) / BS)
@@ -508,6 +520,7 @@ function World:draw(scroll)
         self.light_surf = love.image.newImageData(size_x, size_y)
     end
     local prints = {}
+    local num_rendered_tiles = 0
 
     for ty = min_y, max_y do
         for tx = min_x, max_x do
@@ -517,33 +530,30 @@ function World:draw(scroll)
             local name = blocks.name[tile]
             local bg_name = blocks.name[bg_tile]
 
-            -- get light value
-            local light = (self.lightmap[ty] and self.lightmap[ty][tx]) or 0
-            local norm_light = light / MAX_LIGHT
- 
             -- if there is foreground, draw that. Else, if background, draw that
             if tile ~= nil and name ~= "air" then
                 self.batch:add(blocks.quads[tile], tx * BS, ty * BS, 0, S, S)
-            elseif bg_tile ~= nil and bg_name ~= "air" then
-                self.bg_batch:add(blocks.quads[bg_tile], tx * BS, ty * BS, 0, S, S)
+                num_rendered_tiles = num_rendered_tiles + 1
             end
+            if bg_tile ~= nil and bg_name ~= "air" then
+                self.bg_batch:add(blocks.quads[bg_tile], tx * BS, ty * BS, 0, S, S)
+                num_rendered_tiles = num_rendered_tiles + 1
+            end
+            num_rendered_tiles = num_rendered_tiles + 1
 
-            -- if the block is not light, make it darker according to the calculated darkness
-            -- if not (name == "air" and bg_name) then
-            --     light = math.min(light + 1, MAX_LIGHT)
-                -- table.insert(prints, {light or 0, tx * BS, ty * BS})
-            -- end
-
-            -- only overlay block with darkness if block itself is not a light source
-            if nbwand(name, BF.LIGHT_SOURCE) or (name == "air" and bg_name ~= "air") then
-                if self.lighting then
-                    self.light_surf:setPixel(
+            -- only overlay block with darkness if the block itself is not a light source
+            if self.lighting then
+                -- get light value
+                local light = (self.lightmap[ty] and self.lightmap[ty][tx]) or 0
+                local norm_light = light / 15
+                if nbwand(name, BF.LIGHT_SOURCE) or (name == "air" and bg_name ~= "air") then
+                        self.light_surf:setPixel(
                         tx - min_x, ty - min_y,
                         0, 0, 0, 1 - norm_light
                     )
                 end
+                table.insert(prints, {light or 0, tx * BS, ty * BS})
             end
-            -- table.insert(prints, {light or 0, tx * BS, ty * BS})
 
             -- calculate the lighting offset
             if tx == min_x and ty == min_y then
@@ -555,21 +565,34 @@ function World:draw(scroll)
         end
     end
 
-    self.player:draw(scroll)
-
     -- B L O C K  L I G H T I N G
-    love.graphics.draw(self.batch)
+
+    --[[
+    render steps:
+        - background tiles
+        - foreground tiles
+        - player
+        - lighting overlay
+    --]]
+
     local bg_light_mult = 0.5
     love.graphics.setColor(bg_light_mult, bg_light_mult, bg_light_mult, 1)
     love.graphics.draw(self.bg_batch)
     love.graphics.setColor(Color.WHITE)
+    love.graphics.draw(self.batch)
+
+    -- update the player
+    self.player:draw(scroll)
+    
+    -- render the entities (render here so they work with the lightings)
+    local num_rendered_entities = systems.render:process(self.processed_chunks)
 
     -- debugging
-    love.graphics.setColor(1, 0.8, 0.75, 1)
-    love.graphics.setFont(fonts.orbitron[12])
-    for _, x in ipairs(prints) do
-        love.graphics.print(x[1], x[2], x[3])
-    end
+    -- love.graphics.setColor(1, 0.8, 0.75, 1)
+    -- love.graphics.setFont(fonts.orbitron[12])
+    -- for _, x in ipairs(prints) do
+    --     love.graphics.print(x[1], x[2], x[3])
+    -- end
 
     if self.lighting then
         self.light_surf = love.graphics.newImage(self.light_surf)
@@ -579,9 +602,9 @@ function World:draw(scroll)
 
     love.graphics.setColor(Color.WHITE)
 
-    -- E N T I T I E S
-    local num_rendered_entities = systems.render:process(self.processed_chunks)
-    return num_rendered_entities
+    bench:finish(Color.LIME)
+
+    return num_rendered_tiles, num_rendered_entities
 end
 
 local world = World:new()

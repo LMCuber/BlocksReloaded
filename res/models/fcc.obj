@@ -1,0 +1,102 @@
+# Hexagonal Close-Packed (HCP) Crystal Structure
+# Generated OBJ file showing atomic positions and bonds
+# Centered at origin for proper rotation
+# c/a ratio = 1.633 (ideal HCP)
+
+# Vertices representing atomic positions (centered at origin)
+# Bottom hexagonal layer (z = -1.633)
+v 2.0 0.0 -1.633
+v 1.0 1.732 -1.633
+v -1.0 1.732 -1.633
+v -2.0 0.0 -1.633
+v -1.0 -1.732 -1.633
+v 1.0 -1.732 -1.633
+
+# Middle layer atoms (z = 0) - positioned in gaps of bottom layer
+v 0.0 1.155 0.0
+v -1.732 0.577 0.0
+v -1.732 -0.577 0.0
+v 0.0 -1.155 0.0
+v 1.732 -0.577 0.0
+v 1.732 0.577 0.0
+
+# Top hexagonal layer (z = 1.633) - aligned with bottom layer
+v 2.0 0.0 1.633
+v 1.0 1.732 1.633
+v -1.0 1.732 1.633
+v -2.0 0.0 1.633
+v -1.0 -1.732 1.633
+v 1.0 -1.732 1.633
+
+# Lines representing bonds (nearest neighbor connections only)
+# Each atom in HCP has 12 nearest neighbors
+
+# Bottom layer atoms to middle layer atoms
+l 1 11
+l 1 12
+l 1 7
+
+l 2 7
+l 2 12
+l 2 8
+
+l 3 8
+l 3 7
+l 3 9
+
+l 4 9
+l 4 8
+l 4 10
+
+l 5 10
+l 5 9
+l 5 11
+
+l 6 11
+l 6 10
+l 6 12
+
+# Middle layer atoms to top layer atoms
+l 7 13
+l 7 14
+l 7 15
+
+l 8 15
+l 8 16
+l 8 9
+
+l 9 16
+l 9 17
+l 9 10
+
+l 10 17
+l 10 18
+l 10 11
+
+l 11 18
+l 11 13
+l 11 12
+
+l 12 13
+l 12 14
+l 12 7
+
+# Within-layer bonds in bottom hexagon
+l 1 2
+l 2 3
+l 3 4
+l 4 5
+l 5 6
+l 6 1
+
+# Within-layer bonds in top hexagon
+l 13 14
+l 14 15
+l 15 16
+l 16 17
+l 17 18
+l 18 13
+
+# Object group
+g hcp_crystal
+usemtl crystal_material

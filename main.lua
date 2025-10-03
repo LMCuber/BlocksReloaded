@@ -2,7 +2,8 @@ local Player = require("src.player")
 local Color = require("src.color")
 local Vec2 = require("src.vec2")
 local Vec3 = require("src.vec3")
-local Model = require("src.3d_model");
+local Model = require("src.3d_model")
+local Benchmarker = require("src.benchmarker")
 -- 
 local world = require("src.world")
 local fonts = require("src.fonts")
@@ -13,21 +14,18 @@ local fake_scroll = Vec2:new(0, 0)
 local scroll = Vec2:new(0, 0)
 
 -- dependency injection
+_G.bench = Benchmarker:new(200)
 local player = Player:new(world)
 player.scroll = scroll
+player.bench = bench
 world.player = player
 
 -- global objects
 local model = Model:new({
         obj_path = "res/models/sphere.obj",
         center = Vec2:new(WIDTH / 2, HEIGHT / 2),
-<<<<<<< HEAD
-        size = 20,
-        avel = Vec3:new(0.7, 0.7, 0.7);
-=======
         size = 100,
         avel = Vec3:new(1, 1, 1);
->>>>>>> c6707efd2d98f5e9725674f135441daf833eaf83
     }
 )
 
@@ -75,12 +73,15 @@ function love.update(dt)
     apply_scroll(dt)
 
     local processed_chunks = world:update(dt, scroll)
-    player:update(dt, scroll)
+    player:update(dt)
 
     -- model:update()
+    bench:start(Color.CYAN)
 
     systems.relocate:process(processed_chunks)
     debug_rects = systems.physics:process(processed_chunks)
+
+    bench:finish(Color.CYAN)
 end
 
 -- love draw
@@ -89,8 +90,7 @@ function love.draw()
     love.graphics.translate(-scroll.x, -scroll.y)
 
     -- update the main components: world and player
-    local num_rendered_entities = world:draw(scroll)
-    -- player:draw(scroll)
+    local num_rendered_tiles, num_rendered_entities = world:draw(scroll)
 
     -- debug hitboxes
     for _, rect in ipairs(debug_rects) do
@@ -104,10 +104,21 @@ function love.draw()
     -- model:draw()
 
     -- FPS, debug, etc.
+    bench:draw()
+
+    local debug_info = {
+        "blocks: " .. num_rendered_tiles,
+        "entities: " .. num_rendered_entities,
+    }
+
     love.graphics.setColor(Color.ORANGE)
     love.graphics.setFont(fonts.orbitron[24])
     love.graphics.print("FPS: " .. love.timer.getFPS(), 6, 6)
+
     love.graphics.setFont(fonts.orbitron[18])
-    love.graphics.print("ent. " .. num_rendered_entities, 6, 34)
+    for y, text in ipairs(debug_info) do
+        love.graphics.print(text, 6, 52 + y * 22)
+    end
+
     love.graphics.setColor(1, 1, 1, 1)
 end

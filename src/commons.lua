@@ -40,6 +40,10 @@ function _G.pprint(tbl, indent)
 end
 
 -- useful functions
+function commons.round_to(x, step)
+    return math.floor(x / step + 0.5) * step
+end
+
 function commons.intersect_n(...)
     local tables = {...}
     local counts = {}

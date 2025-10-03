@@ -54,7 +54,7 @@ function Player:process_keypress(key)
             self.vel.y = self.jump_vel
 
         -- check if coyote timer is small enough
-        elseif love.timer.getTime() - self.ground_capture <= self.coyote then
+        elseif self.ground_capture and love.timer.getTime() - self.ground_capture <= self.coyote then
             self.vel.y = self.jump_vel
 
         else
@@ -141,7 +141,7 @@ function Player:interact(scroll)
     end
 end
 
-function Player:move(dt, scroll)
+function Player:move(dt)
     -- process jump capture
     if self.vel.y == 0 and self.jump_capture ~= nil and love.timer.getTime() - self.jump_capture <= self.jump_buffer then
         self.vel.y = self.jump_vel

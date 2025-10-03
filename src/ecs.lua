@@ -29,8 +29,6 @@ function ecs:_get_components(chunk, ...)
 
     local comp_types = {...}
 
-    local ret = {}
-
     -- get all possible collection of entities (based on component type) before intersecting them
     local possible_entities = {}
 
