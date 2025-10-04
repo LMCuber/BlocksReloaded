@@ -10,7 +10,7 @@ local fonts = require("src.fonts")
 local commons = require("src.commons")
 
 -- constants
-local VIEW_PADDING = 2
+local VIEW_PADDING = 15
 local MAX_LIGHT = 15
 
 -- WORLD CLASS
@@ -299,7 +299,7 @@ function World:modify_chunk(key)
 
                 -- entities
                 if chance(1 / 16) then
-                    for i = 1, 1 do
+                    for i = 1, 0 do
                         ecs:create_entity(
                             key,
                             comp.Transform:new(
@@ -310,6 +310,19 @@ function World:modify_chunk(key)
                             comp.Hitbox:late()
                         )
                     end
+                end
+
+                if chance(1 / 11111111111) then
+                    ecs:create_entity(
+                        key,
+                        comp.Transform:new(
+                            Vec2:new(abs_x * BS, (abs_y - 3) * BS),
+                            Vec2:new(0, 0),
+                            0
+                        ),
+                        comp.Sprite:from_path("res/images/mobs/bee/walk.png"),
+                        comp.Hitbox:late()
+                    )
                 end
             end
 
@@ -418,8 +431,7 @@ function World:update(dt, scroll)
 end
 
 function World:propagate_lighting(scroll)
-    bench:start(Color.YELLOW)
-
+    local last = love.timer.getTime()
     -- determine bounds
     local min_x = math.floor(scroll.x / BS) - VIEW_PADDING
     local max_x = math.floor((scroll.x + WIDTH) / BS) + VIEW_PADDING
@@ -441,6 +453,7 @@ function World:propagate_lighting(scroll)
     local head, tail = 1, 0
 
     -- init air tiles
+    bench:start(Color.RED)
     for ty = min_y, max_y do
         for tx = min_x, max_x do
             -- lighting stuff
@@ -465,6 +478,7 @@ function World:propagate_lighting(scroll)
 
         end
     end
+    bench:finish(Color.RED)
 
     -- from the topleft and topright chunks, get intermediate chunks
     local safe = 1
@@ -475,6 +489,8 @@ function World:propagate_lighting(scroll)
     end
 
     -- BFS
+    local steps = 0
+    bench:start(Color.YELLOW)
     while head <= tail do
         local x, y, lv = qx[head], qy[head], ql[head]
         head = head + 1
@@ -487,6 +503,7 @@ function World:propagate_lighting(scroll)
                 local decay = 1
                 local pass_lv = lv - decay
                 if pass_lv > (self.lightmap[ny][nx] or 0) and pass_lv > 0 then
+                    steps = steps + 1
                     self.lightmap[ny][nx] = pass_lv
                     tail = tail + 1
                     qx[tail], qy[tail], ql[tail] = nx, ny, pass_lv
@@ -494,12 +511,16 @@ function World:propagate_lighting(scroll)
             end
         end
     end
-
     bench:finish(Color.YELLOW)
+
+    -- print((love.timer.getTime() - last)*1000 .. "ms")
+
+    _G.debug_info["light steps"] = steps
 
     -- return the processed chunks
     return self.processed_chunks
 end
+
 
 function World:draw(scroll)
     bench:start(Color.LIME)
@@ -545,6 +566,7 @@ function World:draw(scroll)
             if self.lighting then
                 -- get light value
                 local light = (self.lightmap[ty] and self.lightmap[ty][tx]) or 0
+
                 local norm_light = light / 15
                 if nbwand(name, BF.LIGHT_SOURCE) or (name == "air" and bg_name ~= "air") then
                         self.light_surf:setPixel(
@@ -604,7 +626,8 @@ function World:draw(scroll)
 
     bench:finish(Color.LIME)
 
-    return num_rendered_tiles, num_rendered_entities
+    _G.debug_info["entities"] = num_rendered_entities
+    _G.debug_info["tiles"] = num_rendered_tiles
 end
 
 local world = World:new()

@@ -15,6 +15,7 @@ local scroll = Vec2:new(0, 0)
 
 -- dependency injection
 _G.bench = Benchmarker:new(200)
+_G.debug_info = {}
 local player = Player:new(world)
 player.scroll = scroll
 player.bench = bench
@@ -69,7 +70,9 @@ end
 
 -- love update
 function love.update(dt)
+    _G.debug_info = {}
     _G.dt = dt
+    
     apply_scroll(dt)
 
     local processed_chunks = world:update(dt, scroll)
@@ -106,18 +109,16 @@ function love.draw()
     -- FPS, debug, etc.
     bench:draw()
 
-    local debug_info = {
-        "blocks: " .. num_rendered_tiles,
-        "entities: " .. num_rendered_entities,
-    }
-
     love.graphics.setColor(Color.ORANGE)
     love.graphics.setFont(fonts.orbitron[24])
     love.graphics.print("FPS: " .. love.timer.getFPS(), 6, 6)
 
     love.graphics.setFont(fonts.orbitron[18])
-    for y, text in ipairs(debug_info) do
-        love.graphics.print(text, 6, 52 + y * 22)
+
+    local y = 0
+    for debug_type, debug_value in pairs(_G.debug_info) do
+        love.graphics.print(debug_type .. ": " .. debug_value, 6, 80 + y * 22)
+        y = y + 1
     end
 
     love.graphics.setColor(1, 1, 1, 1)

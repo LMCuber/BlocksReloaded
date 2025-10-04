@@ -4,7 +4,7 @@ local yaml = require("src.libs.yaml")
 local anim = {
     data = {}
 }
-local entity_types = {"statics", "player_animations"}
+local entity_types = {"statics", "player_animations", "mobs"}
 for _, entity_type in ipairs(entity_types) do
     local content, _ = love.filesystem.read("res/data/" .. entity_type .. ".yaml")
     local yaml_data = yaml.eval(content)
