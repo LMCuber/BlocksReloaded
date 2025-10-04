@@ -8,7 +8,7 @@ local Benchmarker = require("src.benchmarker")
 local world = require("src.world")
 local fonts = require("src.fonts")
 local systems = require("src.systems")
-local shader = require("src.shader")
+local shaders = require("src.shaders")
 
 local fake_scroll = Vec2:new(0, 0)
 local scroll = Vec2:new(0, 0)
@@ -120,6 +120,10 @@ function love.draw()
         love.graphics.print(debug_type .. ": " .. debug_value, 6, 80 + y * 22)
         y = y + 1
     end
+
+    love.graphics.setShader(shaders.lighting)
+    love.graphics.rectangle("fill", 400, 100, 69, 69)
+    love.graphics.setShader(nil)
 
     love.graphics.setColor(1, 1, 1, 1)
 end
