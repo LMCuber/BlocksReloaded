@@ -53,7 +53,7 @@ function _G.nbwand(name, flag)
 end
 
 function _G.pure(name)
-    local base, var = commons.split(name, "_")
+    local base, var = commons.unpack(commons.split(name, "_"))
     return base, var
 end
 
@@ -110,8 +110,10 @@ for y, layer in ipairs(block_list) do
         flags[name .. "|b"] = bit.bor(flags[name], BF.WALKABLE)
 
         -- special flags
-        local base, var = pure(name)
-        
+        local base, var = pure(name)  -- e.g. "pillar", "vr0"
+        if base == "wood" or base == "leaf" then
+            flags[name] = bit.bor(flags[name], BF.WALKABLE)
+        end
 
         -- next iteration
         id = id + 1

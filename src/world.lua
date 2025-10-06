@@ -509,6 +509,8 @@ function World:draw(scroll)
     end
     local prints = {}
 
+    local last = love.timer.getTime()
+
     for ty = min_y, max_y do
         for tx = min_x, max_x do
             -- get the (bg) tile and (bg) name of the block given absolute coordinates
@@ -517,15 +519,15 @@ function World:draw(scroll)
             local name = blocks.name[tile]
             local bg_name = blocks.name[bg_tile]
 
+
             -- get light value
             local light = (self.lightmap[ty] and self.lightmap[ty][tx]) or 0
             local norm_light = light / MAX_LIGHT
+
+            goto continue
  
             -- if there is foreground, draw that. Else, if background, draw that
             if tile ~= nil and name ~= "air" then
-                if blocks.quads[tile] == nil then
-                    print("NIL", tile, bg_tile, name, bg_name)
-                end
                 self.batch:add(blocks.quads[tile], tx * BS, ty * BS, 0, S, S)
             elseif bg_tile ~= nil and bg_name ~= "air" then
                 self.bg_batch:add(blocks.quads[bg_tile], tx * BS, ty * BS, 0, S, S)
@@ -555,10 +557,12 @@ function World:draw(scroll)
             end
 
             love.graphics.setColor(Color.WHITE)
+
+            ::continue::
         end
     end
 
-    self.player:draw(scroll)
+    print(love.timer.getTime() - last)
 
     -- B L O C K  L I G H T I N G
     love.graphics.draw(self.batch)
@@ -566,6 +570,9 @@ function World:draw(scroll)
     love.graphics.setColor(bg_light_mult, bg_light_mult, bg_light_mult, 1)
     love.graphics.draw(self.bg_batch)
     love.graphics.setColor(Color.WHITE)
+
+    -- update the player
+    self.player:draw(scroll)
 
     -- debugging
     love.graphics.setColor(1, 0.8, 0.75, 1)
