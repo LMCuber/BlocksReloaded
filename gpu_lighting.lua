@@ -1,100 +1,51 @@
--- In your love.load()
 function love.load()
-    -- Create larger canvases (textures)
-    local w, h = 256, 64
+    -- Configuration
+    local width, height = 64, 64  -- Lightmap resolution
     love.graphics.setDefaultFilter("nearest", "nearest")
-    lightmapA = love.graphics.newCanvas(w, h, {format = "r32f"})
-    lightmapB = love.graphics.newCanvas(w, h, {format = "r32f"})
-    tilemap = love.graphics.newCanvas(w, h, {format = "r8"})
     
-    -- Scale for display (makes it bigger on screen)
-    scale = 12
+    -- Create double-buffered lightmaps for ping-pong rendering
+    lightmapA = love.graphics.newCanvas(width, height, {format = "r32f"})
+    lightmapB = love.graphics.newCanvas(width, height, {format = "r32f"})
     
-    -- Create diffusion shader
+    -- Optional: occluder map (0 = passable, 1 = blocks light)
+    occluderMap = love.graphics.newCanvas(width, height, {format = "r8"})
+    
+    -- Light diffusion shader (spreads light from neighbors)
     diffuseShader = love.graphics.newShader([[
         uniform Image lightTex;
-        uniform Image tileTex;
+        uniform Image occluderTex;  // Optional: remove if not using occlusion
         uniform vec2 texelSize;
-        uniform float airFalloff;
-        uniform float solidFalloff;
+        uniform float falloff;
         
         vec4 effect(vec4 color, Image tex, vec2 uv, vec2 screen_coords) {
-            float tile = Texel(tileTex, uv).r;
             float current = Texel(lightTex, uv).r;
             
-            // Sample 4 neighbors
+            // Sample 4-directional neighbors
             float up = Texel(lightTex, uv + vec2(0, texelSize.y)).r;
             float down = Texel(lightTex, uv - vec2(0, texelSize.y)).r;
             float left = Texel(lightTex, uv - vec2(texelSize.x, 0)).r;
             float right = Texel(lightTex, uv + vec2(texelSize.x, 0)).r;
             
-            // Take max neighbor
+            // Find brightest neighbor
             float maxNeighbor = max(max(up, down), max(left, right));
             
-            // Apply falloff based on tile type
-            float falloffToUse = (tile > 0.5) ? solidFalloff : airFalloff;
-            float diffused = max(0.0, maxNeighbor - falloffToUse);
+            // Apply falloff and diffuse
+            float diffused = max(0.0, maxNeighbor - falloff);
             
-            // Keep max of current and diffused
+            // Optional: check occlusion
+            // float occluder = Texel(occluderTex, uv).r;
+            // if (occluder > 0.5) diffused *= 0.1;  // Reduce light in solid areas
+            
+            // Keep the brighter value
             return vec4(max(current, diffused), 0, 0, 1);
         }
     ]])
     
-    -- Render shader (for displaying)
-    renderShader = love.graphics.newShader([[
-        uniform Image lightTex;
-        uniform Image tileTex;
-        
-        vec4 effect(vec4 color, Image tex, vec2 uv, vec2 screen_coords) {
-            float light = Texel(lightTex, uv).r;
-            float tile = Texel(tileTex, uv).r;
-            
-            vec3 outColor;
-            if (tile > 0.5) {
-                // Dirt/Grass
-                if (uv.y < 0.5) {
-                    // Grass
-                    outColor = vec3(0.2, 0.5, 0.1) * (0.2 + light * 0.8);
-                } else {
-                    // Dirt
-                    outColor = vec3(0.35, 0.25, 0.15) * (0.2 + light * 0.8);
-                }
-            } else {
-                // Air
-                if (uv.y < 0.5) {
-                    // Sky - always full brightness
-                    outColor = vec3(0.5, 0.7, 1.0);
-                } else {
-                    // Underground air (caves)
-                    outColor = vec3(0.05, 0.05, 0.08) + vec3(1.0, 0.85, 0.6) * light;
-                }
-            }
-            
-            return vec4(outColor, 1.0);
-        }
-    ]])
-    
-    -- Initialize tilemap: upper half = air (0), lower half = dirt/grass (1)
-    love.graphics.setCanvas(tilemap)
-    love.graphics.clear(0, 0, 0, 1)
-    love.graphics.setColor(1, 1, 1, 1)
-    
-    local midpoint = h / 2
-    for y = 0, h-1 do
-        for x = 0, w-1 do
-            if y >= midpoint then
-                love.graphics.points(x, y)
-            end
-        end
-    end
-    
-    love.graphics.setCanvas()
-    
-    lights = {}
-    iterations = 50
-    airFalloff = 0.02      -- light falloff in air (low = travels far)
-    solidFalloff = 0.15    -- light falloff in solid blocks (high = travels less)
-    lightIntensity = 1.0
+    -- Configuration
+    lights = {}              -- Table of {x, y, intensity}
+    iterations = 50          -- Number of diffusion passes
+    falloff = 1/15          -- Light falloff per iteration (lower = travels farther)
+    displayScale = 16        -- Scale for rendering to screen
     
     isMouseDown = false
     lastPlacedTile = nil
@@ -122,8 +73,8 @@ function love.update(dt)
 end
 
 function handleLightPlacement(screenX, screenY)
-    local tileX = math.floor(screenX / scale)
-    local tileY = math.floor(screenY / scale)
+    local tileX = math.floor(screenX / displayScale)
+    local tileY = math.floor(screenY / displayScale)
     
     local w, h = lightmapA:getWidth(), lightmapA:getHeight()
     if tileX < 0 or tileX >= w or tileY < 0 or tileY >= h then
@@ -136,6 +87,7 @@ function handleLightPlacement(screenX, screenY)
     end
     lastPlacedTile = tileKey
     
+    -- Remove light if clicking on existing one
     for i = #lights, 1, -1 do
         if lights[i].x == tileX and lights[i].y == tileY then
             table.remove(lights, i)
@@ -143,67 +95,92 @@ function handleLightPlacement(screenX, screenY)
         end
     end
     
-    table.insert(lights, {x = tileX, y = tileY, intensity = lightIntensity})
+    -- Otherwise add new light
+    table.insert(lights, {x = tileX, y = tileY, intensity = 1.0})
+end
+
+player_img = love.graphics.newImage("res/images/statics/portal/idle.png")
+function drawPlayer()
+    -- Make sure we're drawing to the screen, not a canvas
+    love.graphics.setCanvas()
+    
+    -- Make sure no shader is active
+    love.graphics.setShader()
+    
+    -- Reset color to white (lighting pass may have changed it)
+    love.graphics.setColor(1, 1, 1, 1)
+    
+    -- Reset blend mode if you changed it
+    love.graphics.setBlendMode("alpha")
+    
+    -- Now draw your player
+    -- Example:
+    love.graphics.circle("fill", 400, 300, 50)
+    -- or
+    -- love.graphics.draw(playerSprite, playerX, playerY)
 end
 
 function love.draw()
+    -- ============================================
+    -- YOUR GAME RENDERING GOES HERE (BEFORE LIGHTING)
+    -- ============================================
+    -- Draw your tiles, sprites, background, etc.
+    -- Example:
+    -- drawTiles()
+    -- drawEntities()
+    drawPlayer()
+    
+    
+    -- ============================================
+    -- LIGHTING PASS STARTS HERE
+    -- ============================================
     local w, h = lightmapA:getWidth(), lightmapA:getHeight()
     
-    -- 1. Initialize lightmap with light sources AND sky brightness
+    -- Step 1: Initialize lightmap with light sources
     love.graphics.setCanvas(lightmapA)
     love.graphics.clear(0, 0, 0, 1)
+    love.graphics.setColor(1, 1, 1, 1)
     
-    -- Fill upper half (sky) with full brightness
-    local midpoint = h / 2
-    love.graphics.setColor(1, 0, 0, 1)
-    for y = 0, midpoint - 1 do
-        for x = 0, w - 1 do
-            love.graphics.points(x, y)
-        end
-    end
-    
-    -- Add user-placed lights
     for _, light in ipairs(lights) do
         love.graphics.setColor(light.intensity, 0, 0, 1)
         love.graphics.points(light.x, light.y)
     end
-    love.graphics.setColor(1, 1, 1, 1)
     
-    -- 2. Diffuse iterations (ping-pong)
+    -- Step 2: Diffuse light (ping-pong between buffers)
     local src = lightmapA
     local dst = lightmapB
     
     love.graphics.setShader(diffuseShader)
-    diffuseShader:send("tileTex", tilemap)
+    diffuseShader:send("lightTex", src)
+    -- diffuseShader:send("occluderTex", occluderMap)  -- Optional
     diffuseShader:send("texelSize", {1/w, 1/h})
-    diffuseShader:send("airFalloff", airFalloff)
-    diffuseShader:send("solidFalloff", solidFalloff)
+    diffuseShader:send("falloff", falloff)
     
     for i = 1, iterations do
         love.graphics.setCanvas(dst)
         diffuseShader:send("lightTex", src)
         love.graphics.draw(src, 0, 0)
-        
         src, dst = dst, src
     end
     
-    -- 3. Final render to screen
+    -- Step 3: Draw lightmap to screen (for debugging/visualization)
     love.graphics.setCanvas()
-    love.graphics.setShader(renderShader)
-    renderShader:send("lightTex", src)
-    renderShader:send("tileTex", tilemap)
-    love.graphics.draw(src, 0, 0, 0, scale, scale)
-    
     love.graphics.setShader()
     
-    -- Draw UI
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.draw(src, 0, 0, 0, displayScale, displayScale)
+    
+    -- ============================================
+    -- UI/HUD RENDERING (AFTER LIGHTING)
+    -- ============================================
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.print("FPS: " .. love.timer.getFPS(), 10, 10)
     love.graphics.print("Lights: " .. #lights, 10, 30)
-    love.graphics.print("Click to place torches", 10, 50)
-    love.graphics.print("Air falloff: " .. airFalloff .. " (Q/A)", 10, 70)
-    love.graphics.print("Solid falloff: " .. solidFalloff .. " (W/S)", 10, 90)
+    love.graphics.print("Click to place/remove lights", 10, 50)
+    love.graphics.print("Falloff: " .. string.format("%.3f", falloff) .. " (Q/A)", 10, 70)
+    love.graphics.print("Iterations: " .. iterations .. " (W/S)", 10, 90)
     love.graphics.print("Press C to clear lights", 10, 110)
+    love.graphics.print("Press ESC to quit", 10, 130)
 end
 
 function love.keypressed(key)
@@ -212,12 +189,22 @@ function love.keypressed(key)
     elseif key == "c" then
         lights = {}
     elseif key == "q" then
-        airFalloff = math.max(0.01, airFalloff - 0.01)
+        falloff = math.max(0.001, falloff - 0.005)
     elseif key == "a" then
-        airFalloff = math.min(0.5, airFalloff + 0.01)
+        falloff = math.min(0.5, falloff + 0.005)
     elseif key == "w" then
-        solidFalloff = math.max(0.01, solidFalloff - 0.01)
+        iterations = math.max(10, iterations - 5)
     elseif key == "s" then
-        solidFalloff = math.min(0.5, solidFalloff + 0.01)
+        iterations = math.min(200, iterations + 5)
     end
+end
+
+-- Example: Add a light at position (x, y)
+function addLight(x, y, intensity)
+    table.insert(lights, {x = x, y = y, intensity = intensity or 1.0})
+end
+
+-- Example: Clear all lights
+function clearLights()
+    lights = {}
 end

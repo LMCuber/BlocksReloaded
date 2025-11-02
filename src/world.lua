@@ -1,13 +1,13 @@
-local Vec2 = require("src.vec2")
+local Vec2 = require("src.libs.vec2")
 local Color = require("src.color")
 -- 
 local blocks = require("src.blocks")
 local biomes = require("src.biome")
-local ecs = require("src.ecs")
+local ecs = require("src.libs.ecs")
 local comp = require("src.components")
 local systems = require("src.systems")
 local fonts = require("src.fonts")
-local commons = require("src.commons")
+local commons = require("src.libs.commons")
 
 -- constants
 local VIEW_PADDING = 15
@@ -299,7 +299,7 @@ function World:modify_chunk(key)
 
                 -- entities
                 if chance(1 / 16) then
-                    for i = 1, 0 do
+                    for i = 1, 1 do
                         ecs:create_entity(
                             key,
                             comp.Transform:new(
@@ -456,7 +456,7 @@ function World:propagate_lighting(scroll)
     bench:start(Color.RED)
     for ty = min_y, max_y do
         for tx = min_x, max_x do
-            -- lighting stuff
+            -- -- lighting stuff
             local name = blocks.name[self:abs_pos_to_tile(tx, ty)]
             local bg_name = blocks.name[self:abs_pos_to_bg_tile(tx, ty)]
 
@@ -480,13 +480,26 @@ function World:propagate_lighting(scroll)
     end
     bench:finish(Color.RED)
 
-    -- from the topleft and topright chunks, get intermediate chunks
+    -- -- from the topleft and topright chunks, get intermediate chunks
     local safe = 1
     for y = chunk_topleft.y - safe, chunk_bottomright.y + safe do
         for x = chunk_topleft.x - safe, chunk_bottomright.x + safe do
             table.insert(self.processed_chunks, commons.key(x, y))
         end
     end
+
+    -- local lightmap_a = love.graphics.newCanvas(max_x - min_x, max_y - min_y, {format = "r32f"})
+    -- local lightmap_b = love.graphics.newCanvas(max_x - min_x, max_y - min_y, {format = "r32f"})
+
+    -- love.graphics.setCanvas(lightmap_a)
+    -- love.graphics.clear(0, 0, 0, 1)
+    -- love.graphics.setColor(1, 1, 1, 1)
+    
+    -- for _, light in ipairs(lights) do
+    --     love.graphics.setColor(light.intensity, 0, 0, 1)
+    --     love.graphics.points(light.x, light.y)
+    -- end
+
 
     -- BFS
     local steps = 0
@@ -520,7 +533,6 @@ function World:propagate_lighting(scroll)
     -- return the processed chunks
     return self.processed_chunks
 end
-
 
 function World:draw(scroll)
     bench:start(Color.LIME)

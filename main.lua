@@ -1,9 +1,9 @@
 local Player = require("src.player")
 local Color = require("src.color")
-local Vec2 = require("src.vec2")
-local Vec3 = require("src.vec3")
+local Vec2 = require("src.libs.vec2")
+local Vec3 = require("src.libs.vec3")
 local Model = require("src.3d_model")
-local Benchmarker = require("src.benchmarker")
+local Benchmarker = require("src.libs.benchmarker")
 -- 
 local world = require("src.world")
 local fonts = require("src.fonts")
@@ -35,13 +35,11 @@ local debug_rects = {}
 
 -- functions
 local function apply_scroll(dt)
-    local m = 0.1
+    local m = 0.04
     fake_scroll.x = fake_scroll.x + (player.pos.x - fake_scroll.x - WIDTH / 2 + 15) * m
     fake_scroll.y = fake_scroll.y + (player.pos.y - fake_scroll.y - HEIGHT / 2 + 15) * m
     scroll.x = math.floor(fake_scroll.x)
     scroll.y = math.floor(fake_scroll.y)
-    -- scroll.x = fake_scroll.x
-    -- scroll.y = fake_scroll.y
 end
 
 -- love callbacks
@@ -120,10 +118,6 @@ function love.draw()
         love.graphics.print(debug_type .. ": " .. debug_value, 6, 80 + y * 22)
         y = y + 1
     end
-
-    love.graphics.setShader(shaders.lighting)
-    love.graphics.rectangle("fill", 400, 100, 69, 69)
-    love.graphics.setShader(nil)
 
     love.graphics.setColor(1, 1, 1, 1)
 end

@@ -1,4 +1,4 @@
-local commons = require("src.commons")
+local commons = require("src.libs.commons")
 
 local entity_manager = {
     counter = 0,

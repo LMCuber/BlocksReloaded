@@ -1,8 +1,8 @@
-local Vec2 = require("src.vec2")
-local Vec3 = require("src.vec3")
+local Vec2 = require("src.libs.vec2")
+local Vec3 = require("src.libs.vec3")
 local Color = require("src.color")
 -- 
-local commons = require("src.commons")
+local commons = require("src.libs.commons")
 
 local Model = {}
 Model.__index = Model

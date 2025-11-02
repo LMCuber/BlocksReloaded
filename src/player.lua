@@ -1,4 +1,4 @@
-local Vec2 = require("src.vec2")
+local Vec2 = require("src.libs.vec2")
 local Color = require("src.color")
 -- 
 local comp = require("src.components")
@@ -27,13 +27,13 @@ function Player:new(world)
         world = world,
         pos = Vec2:new(0, 0),
         vel = Vec2:new(0, 0),
-        anim_skin = "samurai",
+        anim_skin = "ra",
         anim_mode = "run",
         jump_vel = -650,
         speed = 350,
         jump_buffer = 0.15,
         coyote = 0.1,
-        hitbox = comp.Hitbox:new(50, 76),
+        hitbox = comp.Hitbox:new(0, 0),
         mouse_down = false,
         block_action = BlockAction.NONE,
         direc = Direction.NONE,
@@ -86,12 +86,18 @@ function Player:process_mousereleased(mouse_x, mouse_y, button)
 end
 
 function Player:update(dt, scroll)
-    self:move(dt, scroll)
+    self:move(dt)
     self:interact(scroll)
 end
 
 function Player:draw(scroll)
     local anim_data = anim.get(self.anim_skin, self.anim_mode)
+
+    if anim_data.hitbox ~= nil then
+        self.hitbox = comp.Hitbox:new(anim_data.hitbox[1], anim_data.hitbox[2])
+    else
+        self.hitbox = comp.Hitbox:new(52, 80)
+    end
 
     self.sprite.anim = self.sprite.anim + anim_data.speed * _G.dt
     if self.sprite.anim > anim_data.frames + 1 then
@@ -202,8 +208,6 @@ function Player:move(dt)
             self.vel.x = 0
         end
     end
-
-    -- print(self.pos.x - scroll.x)
 
 end
 
