@@ -75,7 +75,7 @@
     }
 
     // Map settings
-    const MAP_SIZE = 2 ** 8;
+    const MAP_SIZE = 2 ** 6;
     const lights = []; // Array of {x, y, intensity}
     let falloff = 0.08;
     let iterations = 25;
@@ -95,7 +95,7 @@
           tilemap[i] = 255;
         }
         // Random walls
-        else if (Math.random() < 0.08) {
+        else if (Math.random() < 0.01) {
           tilemap[i] = 255;
         }
       }

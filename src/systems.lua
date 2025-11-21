@@ -1,6 +1,6 @@
-local ecs = require("src.ecs")
+local ecs = require("src.libs.ecs")
 local comp = require("src.components")
-local commons = require("src.commons")
+local commons = require("src.libs.commons")
 local anim = require("src.animation")
 
 -- S Y S T E M S

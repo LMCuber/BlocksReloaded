@@ -1,5 +1,6 @@
 
 local yaml = require("src.libs.yaml")
+local commons = require("src.libs.commons")
 
 local anim = {
     data = {}
@@ -9,6 +10,11 @@ for _, entity_type in ipairs(entity_types) do
     local content, _ = love.filesystem.read("res/data/" .. entity_type .. ".yaml")
     local yaml_data = yaml.eval(content)
 
+    -- safety for the LSP
+    if type(yaml_data) ~= "table" then
+        goto continue
+    end
+
     for skin, _ in pairs(yaml_data) do
         anim.data[skin] = {}
 
@@ -17,13 +23,13 @@ for _, entity_type in ipairs(entity_types) do
             anim.data[skin][mode]["frames"] = yaml_data[skin][mode]["frames"]
             anim.data[skin][mode]["speed"] = yaml_data[skin][mode]["speed"] or 11
             anim.data[skin][mode]["offset"] = yaml_data[skin][mode]["offset"]
-            
+
             anim.data[skin][mode]["sprs"] = love.graphics.newImage(string.format(
                 "res/images/%s/%s/%s.png",  -- stupid fucking lua
                 entity_type, skin, mode
             ))
             anim.data[skin][mode]["sprs"]:setFilter("nearest", "nearest")
-         
+
             anim.data[skin][mode]["quads"] = {}
             for i = 1, anim.data[skin][mode]["frames"] do
                 local w = anim.data[skin][mode]["sprs"]:getWidth() / anim.data[skin][mode]["frames"]
@@ -40,15 +46,18 @@ for _, entity_type in ipairs(entity_types) do
             end
         end
     end
+
+    ::continue::
 end
 
 function anim.get(skin, mode)
+    local anim_data = anim.data[skin][mode]
     return {
-        sprs = anim.data[skin][mode]["sprs"],
-        quads = anim.data[skin][mode]["quads"],
-        frames = anim.data[skin][mode]["frames"],
-        speed = anim.data[skin][mode]["speed"],
-        offset = anim.data[skin][mode]["offset"],
+        sprs = anim_data["sprs"],
+        quads = anim_data["quads"],
+        frames = anim_data["frames"],
+        speed = anim_data["speed"],
+        offset = anim_data["offset"],
     }
 end
 

@@ -1,4 +1,4 @@
-local Vec2 = require("src.Vec2")
+local Vec2 = require("src.libs.vec2")
 
 -- C O M P O N E N T S
 local Transform = {}
