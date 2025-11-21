@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>GPU Light Diffusion</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #1a1a1a;
+      color: #fff;
+      font-family: monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    canvas {
+      border: 2px solid #444;
+      image-rendering: pixelated;
+      cursor: crosshair;
+    }
+    .controls {
+      margin-top: 20px;
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .control {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    label {
+      font-size: 12px;
+    }
+    input[type="range"] {
+      width: 150px;
+    }
+  </style>
+</head>
+<body>
+  <h2>GPU Light Diffusion - Click to Add/Remove Lights</h2>
+  <div style="margin-bottom: 10px;">FPS: <span id="fps">0</span></div>
+  <canvas id="canvas" width="1400" height="1400"></canvas>
+  <div class="controls">
+    <div class="control">
+      <label>Intensity: <span id="intensityVal">1.0</span></label>
+      <input type="range" id="intensity" min="0" max="2" step="0.1" value="1.0">
+    </div>
+    <div class="control">
+      <label>Falloff: <span id="falloffVal">0.08</span></label>
+      <input type="range" id="falloff" min="0.01" max="0.3" step="0.01" value="0.08">
+    </div>
+    <div class="control">
+      <label>Iterations: <span id="iterVal">25</span></label>
+      <input type="range" id="iterations" min="5" max="50" step="1" value="25">
+    </div>
+    <div class="control">
+      <button id="clearLights">Clear All Lights</button>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const gl = canvas.getContext('webgl2');
+    
+    if (!gl) {
+      alert('WebGL2 not supported');
+    }
+
+    // Enable float texture rendering
+    const ext = gl.getExtension('EXT_color_buffer_float');
+    if (!ext) {
+      alert('EXT_color_buffer_float not supported');
+    }
+
+    // Map settings
+    const MAP_SIZE = 2 ** 8;
+    const lights = []; // Array of {x, y, intensity}
+    let falloff = 0.08;
+    let iterations = 25;
+
+    // FPS counter
+    let lastTime = performance.now();
+    let frameCount = 0;
+    let fps = 0;
+
+    // Create tilemap (0 = empty, 1 = wall)
+    const tilemap = new Uint8Array(MAP_SIZE * MAP_SIZE);
+    for (let y = 0; y < MAP_SIZE; y++) {
+      for (let x = 0; x < MAP_SIZE; x++) {
+        const i = y * MAP_SIZE + x;
+        // Borders
+        if (x === 0 || x === MAP_SIZE - 1 || y === 0 || y === MAP_SIZE - 1) {
+          tilemap[i] = 255;
+        }
+        // Random walls
+        else if (Math.random() < 0.08) {
+          tilemap[i] = 255;
+        }
+      }
+    }
+    
+    // Add some rooms
+    for (let y = 16; y < 24; y++) {
+      for (let x = 16; x < 40; x++) {
+        if (x === 16 || x === 39 || y === 16 || y === 23) {
+          tilemap[y * MAP_SIZE + x] = 255;
+        } else {
+          tilemap[y * MAP_SIZE + x] = 0;
+        }
+      }
+    }
+
+    // Vertex shader
+    const vsSource = `#version 300 es
+      in vec2 position;
+      out vec2 uv;
+      void main() {
+        uv = position * 0.5 + 0.5;
+        gl_Position = vec4(position, 0.0, 1.0);
+      }
+    `;
+
+    // Diffusion shader - spreads light one step
+    const diffuseSource = `#version 300 es
+      precision highp float;
+      in vec2 uv;
+      out vec4 outColor;
+      
+      uniform sampler2D lightTex;
+      uniform sampler2D tileTex;
+      uniform vec2 texelSize;
+      uniform float falloffAmount;
+      
+      void main() {
+        float tile = texture(tileTex, uv).r;
+        
+        // Walls block light
+        if (tile > 0.5) {
+          outColor = vec4(0.0, 0.0, 0.0, 1.0);
+          return;
+        }
+        
+        float current = texture(lightTex, uv).r;
+        
+        // Sample 4 neighbors
+        float up = texture(lightTex, uv + vec2(0, texelSize.y)).r;
+        float down = texture(lightTex, uv - vec2(0, texelSize.y)).r;
+        float left = texture(lightTex, uv - vec2(texelSize.x, 0)).r;
+        float right = texture(lightTex, uv + vec2(texelSize.x, 0)).r;
+        
+        // Block light through walls
+        if (texture(tileTex, uv + vec2(0, texelSize.y)).r > 0.5) up = 0.0;
+        if (texture(tileTex, uv - vec2(0, texelSize.y)).r > 0.5) down = 0.0;
+        if (texture(tileTex, uv - vec2(texelSize.x, 0)).r > 0.5) left = 0.0;
+        if (texture(tileTex, uv + vec2(texelSize.x, 0)).r > 0.5) right = 0.0;
+        
+        // Max neighbor minus falloff
+        float maxNeighbor = max(max(up, down), max(left, right));
+        float diffused = max(0.0, maxNeighbor - falloffAmount);
+        
+        // Keep maximum of current and diffused
+        outColor = vec4(max(current, diffused), 0.0, 0.0, 1.0);
+      }
+    `;
+
+    // Render shader - final display
+    const renderSource = `#version 300 es
+      precision highp float;
+      in vec2 uv;
+      out vec4 outColor;
+      
+      uniform sampler2D lightTex;
+      uniform sampler2D tileTex;
+      
+      void main() {
+        float light = texture(lightTex, uv).r;
+        float tile = texture(tileTex, uv).r;
+        
+        vec3 color;
+        if (tile > 0.5) {
+          // Wall
+          color = vec3(0.15, 0.15, 0.2) * (0.2 + light * 0.8);
+        } else {
+          // Floor
+          color = vec3(0.05, 0.08, 0.1) + vec3(1.0, 0.85, 0.6) * light;
+        }
+        
+        outColor = vec4(color, 1.0);
+      }
+    `;
+
+    function compileShader(type, source) {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        console.error(gl.getShaderInfoLog(shader));
+        return null;
+      }
+      return shader;
+    }
+
+    function createProgram(vs, fs) {
+      const program = gl.createProgram();
+      gl.attachShader(program, compileShader(gl.VERTEX_SHADER, vs));
+      gl.attachShader(program, compileShader(gl.FRAGMENT_SHADER, fs));
+      gl.linkProgram(program);
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        console.error(gl.getProgramInfoLog(program));
+        return null;
+      }
+      return program;
+    }
+
+    const diffuseProgram = createProgram(vsSource, diffuseSource);
+    const renderProgram = createProgram(vsSource, renderSource);
+
+    // Quad
+    const quad = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
+    const quadBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
+
+    // Create textures
+    function createFloatTexture() {
+      const tex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      const data = new Float32Array(MAP_SIZE * MAP_SIZE * 4);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, MAP_SIZE, MAP_SIZE, 0, 
+                    gl.RGBA, gl.FLOAT, data);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      return tex;
+    }
+
+    function createTileTexture(data) {
+      const tex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, MAP_SIZE, MAP_SIZE, 0, 
+                    gl.RED, gl.UNSIGNED_BYTE, data);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      return tex;
+    }
+
+    const tileTex = createTileTexture(tilemap);
+    const lightTex1 = createFloatTexture();
+    const lightTex2 = createFloatTexture();
+
+    // Framebuffers for ping-pong
+    const fb1 = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb1);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, lightTex1, 0);
+    
+    const fb2 = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb2);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, lightTex2, 0);
+
+    function setupVertexAttrib(program) {
+      const pos = gl.getAttribLocation(program, 'position');
+      gl.enableVertexAttribArray(pos);
+      gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
+    }
+
+    function render() {
+      // FPS calculation
+      frameCount++;
+      const currentTime = performance.now();
+      if (currentTime >= lastTime + 1000) {
+        fps = Math.round((frameCount * 1000) / (currentTime - lastTime));
+        document.getElementById('fps').textContent = fps;
+        frameCount = 0;
+        lastTime = currentTime;
+      }
+
+      gl.viewport(0, 0, MAP_SIZE, MAP_SIZE);
+      gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
+
+      // Initialize light texture with all light sources
+      const initData = new Float32Array(MAP_SIZE * MAP_SIZE * 4);
+      for (const light of lights) {
+        const idx = (light.y * MAP_SIZE + light.x) * 4;
+        initData[idx] = Math.max(initData[idx], light.intensity);
+      }
+      
+      gl.bindTexture(gl.TEXTURE_2D, lightTex1);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, MAP_SIZE, MAP_SIZE, gl.RGBA, gl.FLOAT, initData);
+
+      // Diffuse iterations (ping-pong between textures)
+      let srcTex = lightTex1;
+      let srcFb = fb1;
+      let dstTex = lightTex2;
+      let dstFb = fb2;
+      
+      gl.useProgram(diffuseProgram);
+      setupVertexAttrib(diffuseProgram);
+      
+      const lightLoc = gl.getUniformLocation(diffuseProgram, 'lightTex');
+      const tileLoc = gl.getUniformLocation(diffuseProgram, 'tileTex');
+      const texelLoc = gl.getUniformLocation(diffuseProgram, 'texelSize');
+      const falloffLoc = gl.getUniformLocation(diffuseProgram, 'falloffAmount');
+      
+      for (let i = 0; i < iterations; i++) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, dstFb);
+        
+        gl.uniform1i(lightLoc, 0);
+        gl.uniform1i(tileLoc, 1);
+        gl.uniform2f(texelLoc, 1.0/MAP_SIZE, 1.0/MAP_SIZE);
+        gl.uniform1f(falloffLoc, falloff);
+        
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, srcTex);
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, tileTex);
+        
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        
+        // Swap
+        const tempTex = srcTex;
+        const tempFb = srcFb;
+        srcTex = dstTex;
+        srcFb = dstFb;
+        dstTex = tempTex;
+        dstFb = tempFb;
+      }
+
+      // Final render to screen
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.useProgram(renderProgram);
+      setupVertexAttrib(renderProgram);
+      
+      gl.uniform1i(gl.getUniformLocation(renderProgram, 'lightTex'), 0);
+      gl.uniform1i(gl.getUniformLocation(renderProgram, 'tileTex'), 1);
+      
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, srcTex);
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, tileTex);
+      
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    }
+
+    // Controls
+    canvas.addEventListener('click', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / rect.width;
+      const y = 1 - (e.clientY - rect.top) / rect.height;
+      const tileX = Math.floor(x * MAP_SIZE);
+      const tileY = Math.floor(y * MAP_SIZE);
+      
+      // Check if clicking on existing light to remove it
+      const existingIndex = lights.findIndex(l => l.x === tileX && l.y === tileY);
+      if (existingIndex !== -1) {
+        lights.splice(existingIndex, 1);
+      } else {
+        // Add new light
+        const currentIntensity = parseFloat(document.getElementById('intensity').value);
+        lights.push({ x: tileX, y: tileY, intensity: currentIntensity });
+      }
+    });
+    
+    // Animate continuously
+    function animate() {
+      render();
+      requestAnimationFrame(animate);
+    }
+
+    document.getElementById('intensity').addEventListener('input', (e) => {
+      const intensity = parseFloat(e.target.value);
+      document.getElementById('intensityVal').textContent = intensity.toFixed(1);
+    });
+
+    document.getElementById('falloff').addEventListener('input', (e) => {
+      falloff = parseFloat(e.target.value);
+      document.getElementById('falloffVal').textContent = falloff.toFixed(2);
+    });
+
+    document.getElementById('iterations').addEventListener('input', (e) => {
+      iterations = parseInt(e.target.value);
+      document.getElementById('iterVal').textContent = iterations;
+    });
+    
+    document.getElementById('clearLights').addEventListener('click', () => {
+      lights.length = 0;
+    });
+
+    // Start with one light in the middle
+    lights.push({ x: 32, y: 32, intensity: 1.0 });
+    animate();
+  </script>
+</body>
+</html>

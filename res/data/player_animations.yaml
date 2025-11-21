@@ -16,7 +16,7 @@ samurai:
         frames: 8
         offset: -6
     idle:
-        frames: 1
+        frames: 2
         offset: -4
         speed: 0.012
 

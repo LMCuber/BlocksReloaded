@@ -11,21 +11,21 @@ _G.WIDTH, _G.HEIGHT = love.graphics.getDimensions()
 
 -- BLOCK FLAGS
 _G.BF = {
-    NONE         = 0,  -- not an empty block block; just means that there is no flag
-    EMPTY        = 0,  -- an empty block (empty means that if it is clicked on, it will place instead of break)
+    NONE         = 0,  -- NOT an empty block block; just means that there is no flag
+    EMPTY        = 0,  -- an empty block (empty means that if it is clicked on, the player will place a new block instead of break)
     WALKABLE     = 0,  -- anything walkable
     LIGHT_SOURCE = 0,  -- air, torch, jack-o-lantern, etc.
     ORE          = 0,  -- coal, titanium, diamond, etc.
-    ORNAMENT     = 0,  -- flowers, rocks, etc. Must be walkable.
+    ORNAMENT     = 0,  -- flowers, rocks, etc. Subset of "walkable".
 }
--- set the enum values from 0 to powers of 2
+-- set the enum values from 0 to powers of 2 (they are initialized at 0 by defaylt)
 local exp = 0
 for block, _ in pairs(BF) do
     BF[block] = 2 ^ exp
     exp = exp + 1
 end
 
--- FLAGS GET STRING NAME AS INPUT, NOT ID!!!
+-- flags get STRING name as input, NOT id!
 local flags = {
     air              = bit.bor(BF.EMPTY, BF.WALKABLE, BF.LIGHT_SOURCE),
     torch            = bit.bor(BF.LIGHT_SOURCE, BF.WALKABLE),
@@ -35,7 +35,7 @@ local flags = {
     orchid           = BF.ORNAMENT,
 }
 
--- mutual flags
+-- subset flags
 for name, flag in pairs(flags) do
     -- all ornaments are walkable by default
     if bit.band(flag, BF.ORNAMENT) ~= 0 then
