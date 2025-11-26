@@ -27,7 +27,7 @@ function Player:new(world)
         world = world,
         pos = Vec2:new(0, 0),
         vel = Vec2:new(0, 0),
-        anim_skin = "ra",
+        anim_skin = "samurai",
         anim_mode = "run",
         jump_vel = -650,
         speed = 350,

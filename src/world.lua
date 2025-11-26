@@ -8,6 +8,7 @@ local comp = require("src.components")
 local systems = require("src.systems")
 local fonts = require("src.fonts")
 local commons = require("src.libs.commons")
+local yaml = require("src.libs.yaml")
 
 -- constants
 local VIEW_PADDING = 15
@@ -43,9 +44,31 @@ function World:new()
     obj.y_seed = love.math.random()
     obj.processed_chunks = {}
 
+    obj:load_structures()
+
     love.math.setRandomSeed(obj.x_seed)
 
     return obj
+end
+
+function World:load_structures()
+    self.structures = {}
+
+    local content, _ = love.filesystem.read("res/data/structures.yaml")
+    self.structures = yaml.eval(content)
+
+    pprint(self.structures)
+end
+
+function World:place_structure(structure, key, x, y)
+    for _, block_data in ipairs(self.structures[structure]) do
+        self:set(
+            key,
+            x + block_data[1],
+            y + block_data[2],
+            block_data[3]
+        )
+    end
 end
 
 function World:process_keypress(key)
@@ -323,6 +346,11 @@ function World:modify_chunk(key)
                         comp.Sprite:from_path("res/images/mobs/bee/walk.png"),
                         comp.Hitbox:late()
                     )
+                end
+
+                if chance(1 / 10) then
+                    -- self:set(key, x, y - 3, "dynamite")
+                    self:place_structure("well", key, x, y)
                 end
             end
 
