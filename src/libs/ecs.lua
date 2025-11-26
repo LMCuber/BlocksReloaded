@@ -11,7 +11,7 @@ function entity_manager:get_id()
 end
 
 local component_manager = {
-    cache = {},
+    cache = {},  -- TODO: cache
     components = {},
 }
 
@@ -125,7 +125,6 @@ function ecs:create_entity(chunk, ...)
         entity_manager.entities[ent_id][comp_name] = comp_obj
 
     end
-    -- clear_cache()
 end
 
 return ecs

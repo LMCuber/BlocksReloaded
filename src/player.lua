@@ -27,7 +27,7 @@ function Player:new(world)
         world = world,
         pos = Vec2:new(0, 0),
         vel = Vec2:new(0, 0),
-        anim_skin = "ra",
+        anim_skin = "samurai",
         anim_mode = "run",
         jump_vel = -650,
         speed = 350,
@@ -133,7 +133,7 @@ function Player:draw(scroll)
     love.graphics.setColor(Color.WHITE)
 end
 
-function Player:interact(scroll)
+function Player:interact()
     if self.mouse_down then
         local mouse_x, mouse_y = love.mouse.getPosition()
         local key, block_x, block_y = self.world:mouse_to_timbre(mouse_x, mouse_y, self.scroll)

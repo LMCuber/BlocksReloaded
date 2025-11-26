@@ -63,6 +63,7 @@ function World:octave_noise(args)
     local pers = args.pers or 1
     local lac = args.lac or 1
     local octaves = args.octaves or 1
+    local worm = args.worm or false
 
     local noise = 0
     local max_value = 0
@@ -76,8 +77,14 @@ function World:octave_noise(args)
         amp = amp * pers
         freq = freq * lac
     end
-    
-    return noise / max_value
+
+    local final_value = noise / max_value
+
+    if worm then
+        return -math.abs(2 * final_value - 1) + 1
+    end
+
+    return final_value
 end
 
 function World:create_chunk(cx, cy)
@@ -105,22 +112,25 @@ function World:create_chunk(cx, cy)
         }) - 0.5) * 32)
         local dirt_height = ground_height + 16
 
-        -- the final data that will be saved
-        -- EVERYTHING ABOVE SOIL LEVEL IS AIR
-        local name = "air"
-        local bg_name = "air"
 
         for rel_y = 1, CH do
+            -- the final data that will be saved
+            -- EVERYTHING ABOVE SOIL LEVEL IS AIR BY DEFAULT
+            local name = "air"
+            local bg_name = "air"
+
             local block_y = cy * CH + (rel_y - 1)
 
             if block_y >= ground_height then
                 local noise = self:octave_noise({
                     x = block_x,
                     y = block_y,
-                    freq = 0.05,
+                    freq = 0.02,
                     pers = 0.5,
                     lac = 2,
-                    octaves = 2
+                    octaves = 2,
+                    -- worm = false,
+                    worm = true,
                 })
 
                 if block_y <= dirt_height then
@@ -131,7 +141,7 @@ function World:create_chunk(cx, cy)
                     end
                     bg_name = biome.dirt
                 else
-                    if noise > 0.45 then
+                    if noise < 0.8 then
                         name = self:get_ore()
                     end
                     bg_name = "stone"
@@ -144,7 +154,6 @@ function World:create_chunk(cx, cy)
             if bg_name ~= nil then
                 self.bg_data[key][rel_x][rel_y] = blocks.id[bg_name]
             end
-
         end
     end
 
@@ -253,7 +262,7 @@ function World:modify_chunk(key)
                     end
                     self:set(key, x, y - 1, flower)
                 end
-                
+              
                 -- tree
                 if chance(1 / 15) then
                     local tree_height = love.math.random(4, 16)
@@ -298,8 +307,8 @@ function World:modify_chunk(key)
                 end
 
                 -- entities
-                if chance(1 / 16) then
-                    for i = 1, 1 do
+                if chance(1 / 1) then
+                    for i = 1, 10 do
                         ecs:create_entity(
                             key,
                             comp.Transform:new(
@@ -310,19 +319,6 @@ function World:modify_chunk(key)
                             comp.Hitbox:late()
                         )
                     end
-                end
-
-                if chance(1 / 11111111111) then
-                    ecs:create_entity(
-                        key,
-                        comp.Transform:new(
-                            Vec2:new(abs_x * BS, (abs_y - 3) * BS),
-                            Vec2:new(0, 0),
-                            0
-                        ),
-                        comp.Sprite:from_path("res/images/mobs/bee/walk.png"),
-                        comp.Hitbox:late()
-                    )
                 end
             end
 
@@ -487,20 +483,7 @@ function World:propagate_lighting(scroll)
             table.insert(self.processed_chunks, commons.key(x, y))
         end
     end
-
-    -- local lightmap_a = love.graphics.newCanvas(max_x - min_x, max_y - min_y, {format = "r32f"})
-    -- local lightmap_b = love.graphics.newCanvas(max_x - min_x, max_y - min_y, {format = "r32f"})
-
-    -- love.graphics.setCanvas(lightmap_a)
-    -- love.graphics.clear(0, 0, 0, 1)
-    -- love.graphics.setColor(1, 1, 1, 1)
-    
-    -- for _, light in ipairs(lights) do
-    --     love.graphics.setColor(light.intensity, 0, 0, 1)
-    --     love.graphics.points(light.x, light.y)
-    -- end
-
-
+ 
     -- BFS
     local steps = 0
     bench:start(Color.YELLOW)
@@ -621,12 +604,15 @@ function World:draw(scroll)
     -- render the entities (render here so they work with the lightings)
     local num_rendered_entities = systems.render:process(self.processed_chunks)
 
-    -- debugging
-    -- love.graphics.setColor(1, 0.8, 0.75, 1)
-    -- love.graphics.setFont(fonts.orbitron[12])
-    -- for _, x in ipairs(prints) do
-    --     love.graphics.print(x[1], x[2], x[3])
-    -- end
+    -- render chunk border rectangles (visual)
+    for _, chunk_key in ipairs(self.processed_chunks) do
+        love.graphics.setColor(Color.CYAN)
+        local chunk_x, chunk_y = commons.parse_key(chunk_key)
+        chunk_x = chunk_x * CW * BS
+        chunk_y = chunk_y * CH * BS
+        love.graphics.rectangle("line", chunk_x, chunk_y, CW * BS, CH * BS)
+        love.graphics.print(chunk_key, chunk_x + CW * BS / 2, chunk_y + CH * BS / 2)
+    end
 
     if self.lighting then
         self.light_surf = love.graphics.newImage(self.light_surf)
