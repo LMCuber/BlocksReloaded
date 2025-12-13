@@ -363,8 +363,7 @@ function World:modify_chunk(key)
                             0
                         ),
                         comp.Sprite:from_path("res/images/mobs/bee/walk.png"),
-                        comp.Hitbox:late(),
-                        comp.PlayerFollower:new()
+                        comp.Hitbox:late()
                     )
                 end
 
@@ -664,7 +663,7 @@ function World:draw(scroll)
     love.graphics.draw(self.batch)
 
     -- update the player
-    self.player:draw(scroll)
+    -- self.player:draw(scroll)
 
     -- render the entities (render here so they work with the lightings)
     local num_rendered_entities = systems.render:process(self.processed_chunks)

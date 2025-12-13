@@ -1,14 +1,27 @@
 local Vec2 = require("src.libs.vec2")
 
 -- C O M P O N E N T S
-local PlayerFollower = {}
-PlayerFollower.__index = PlayerFollower
-PlayerFollower._name = "PlayerFollower"
+local Controllable = {}
+Controllable.__index = Controllable
+Controllable._name = "Controllable"
 
-function PlayerFollower:new()
-    local obj = setmetatable({}, PlayerFollower)
+function Controllable:new()
+    local obj = setmetatable({}, Controllable)
     return obj
 end
+
+-------------------------------------------------
+
+local CameraAnchor = {}
+CameraAnchor.__index = CameraAnchor
+CameraAnchor._name = "Transform"
+
+function CameraAnchor:new(speed)
+    local obj = setmetatable({speed = speed}, CameraAnchor)
+    return obj
+end
+
+-------------------------------------------------
 
 local Transform = {}
 Transform.__index = Transform
@@ -25,7 +38,7 @@ function Transform:new(pos, vel, gravity, sines, rot, rot_vel)
     obj.sines = Vec2:new(0, 0)
     obj.rot = rot or 0
     obj.rot_vel = rot_vel or 0
-    
+
     obj.def_vel = vel:copy()
     obj.last_tile = nil
     obj.last_blocks_around = nil
@@ -36,9 +49,11 @@ function Transform:new(pos, vel, gravity, sines, rot, rot_vel)
             love.math.random() * 2 * math.pi
         )
     end
-    
+
     return obj
 end
+
+-------------------------------------------------
 
 local Sprite = {}
 Sprite.__index = Sprite
@@ -48,7 +63,7 @@ function Sprite:from_path(path)
     local obj = setmetatable({}, Sprite)
 
     obj.path = path
-    
+
     obj.anim_skin, obj.anim_mode = path:match(".*/(.-)/(.-)%.png$")  -- (portal, idle)
 
     obj.img = love.graphics.newImage(path)
@@ -56,6 +71,8 @@ function Sprite:from_path(path)
     return obj
 
 end
+
+-------------------------------------------------
 
 local Hitbox = {}
 Hitbox.__index = Hitbox
@@ -65,7 +82,7 @@ function Hitbox:new(w, h)
     local obj = setmetatable({}, Hitbox)
 
     obj.w, obj.h = w, h
-    
+
     return obj
 end
 
@@ -88,11 +105,14 @@ function Hitbox:__tostring()
     return string.format("Hitbox(%d, %d)", self.w, self.h)
 end
 
+-------------------------------------------------
+
 local comp = {
     Transform = Transform,
     Sprite = Sprite,
     Hitbox = Hitbox,
-    PlayerFollower = PlayerFollower,
+    CameraAnchor = CameraAnchor,
+    Controllable = Controllable,
 }
 
 return comp

@@ -1,15 +1,33 @@
+---@diagnostic disable: need-check-nil
 local ecs = require("src.libs.ecs")
-local comp = require("src.components")
 local commons = require("src.libs.commons")
+local Vec2 = require("src.libs.vec2")
+--
+local comp = require("src.components")
 local anim = require("src.animation")
 
 -- S Y S T E M S
 local systems = {
-    relocate = {},
+    _misc = {
+        relocate = {},
+        controllable = {},
+    },
+
+    _singletons = {
+        fake_scroll = Vec2:new(0, 0),
+        scroll = Vec2:new(0, 0)
+    },
+
     physics = {},
     render = {},
-    player_follower = {}
+    camera = {},
 }
+
+function systems:process_misc_systems(chunks)
+    for _, system in pairs(systems._misc) do
+        system:process(chunks)
+    end
+end
 
 function systems.render:process(chunks)
     local num_rendered = 0
@@ -81,7 +99,21 @@ function systems.physics:process(chunks)
     return debug_rects
 end
 
-function systems.relocate:process(chunks)
+function systems.camera:process(chunks)
+    for _, entry in ipairs(ecs:get_components(chunks, comp.CameraAnchor, comp.Transform)) do
+        local _, _, cam, tr = commons.unpack(entry)
+
+        systems._singletons.scroll.x = systems._singletons.scroll.x + (tr.pos.x - systems._singletons.scroll.x - WIDTH / 2 + 15) * cam.speed
+        systems._singletons.scroll.y = systems._singletons.scroll.y + (tr.pos.y - systems._singletons.scroll.y - HEIGHT / 2 + 15) * cam.speed
+        systems._singletons.scroll.x = math.floor(systems._singletons.scroll.x)
+        systems._singletons.scroll.y = math.floor(systems._singletons.scroll.y)
+        love.graphics.translate(-systems._singletons.scroll.x, -systems._singletons.scroll.y)
+    end
+end
+
+-- M I S C E L L A N E O U S  S Y S T E M S -------------------------------------------------------
+
+function systems._misc.relocate:process(chunks)
     for _, entry in ipairs(ecs:get_components(chunks, comp.Transform)) do
         local ent_id, chunk, tr = commons.unpack(entry)
 
@@ -101,13 +133,10 @@ function systems.relocate:process(chunks)
     end
 end
 
-function systems.player_follower:process(chunks)
-    for _, entry in ipairs(ecs:get_compnents(chunks, comp.Transform)) do
-        pprint(entry)
+function systems._misc.controllable:process(chunks)
+    for _, entry in ipairs(ecs:get_components(chunks, comp.Controllable, comp.Transform)) do
+        local _, _, _, tr = commons.unpack(entry)
     end
 end
-
-
-
 
 return systems

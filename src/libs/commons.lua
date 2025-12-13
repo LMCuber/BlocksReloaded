@@ -4,15 +4,6 @@ local commons = {}
 _G.GRAVITY = 2600
 _G.WIDTH, _G.HEIGHT = love.graphics.getDimensions()
 
-function commons.key(cx, cy)
-    return cx .. "," .. cy
-end
-
-function commons.parse_key(key)
-    local cx, cy = key:match("(-?%d+),(-?%d+)")
-    return tonumber(cx), tonumber(cy)
-end
-
 function _G.test(...)
     print(love.math.random(0, 999), ...)
 end
@@ -36,10 +27,23 @@ function _G.pprint(tbl, indent)
             print(formatting .. "  " .. key .. " = " .. tostring(v))
         end
     end
-    print(formatting .. "}")
+    print(formatting .. "}" .. "  " .. "(#" .. #tbl .. ")")
+end
+
+function _G.hbar()
+    print("----------------------------------------------------------------------")
 end
 
 -- useful functions
+function commons.key(cx, cy)
+    return cx .. "," .. cy
+end
+
+function commons.parse_key(key)
+    local cx, cy = key:match("(-?%d+),(-?%d+)")
+    return tonumber(cx), tonumber(cy)
+end
+
 function commons.round_to(x, step)
     return math.floor(x / step + 0.5) * step
 end

@@ -1,17 +1,14 @@
+---@diagnostic disable: duplicate-set-field, lowercase-global
 local Player = require("src.player")
 local Color = require("src.color")
 local Vec2 = require("src.libs.vec2")
-local Vec3 = require("src.libs.vec3")
-local Model = require("src.3d_model")
 local Benchmarker = require("src.libs.benchmarker")
+local ecs = require("src.libs.ecs")
+local comp = require("src.components")
 -- 
 local world = require("src.world")
 local fonts = require("src.fonts")
 local systems = require("src.systems")
-local shaders = require("src.shaders")
-
-local fake_scroll = Vec2:new(0, 0)
-local scroll = Vec2:new(0, 0)
 
 -- dependency injection
 _G.bench = Benchmarker:new(200)
@@ -21,26 +18,23 @@ player.scroll = scroll
 player.bench = bench
 world.player = player
 
--- global objects
-local model = Model:new({
-        obj_path = "res/models/sphere.obj",
-        center = Vec2:new(WIDTH / 2, HEIGHT / 2),
-        size = 100,
-        avel = Vec3:new(1, 1, 1);
-    }
+-- player entity
+ecs.create_entity(
+    {0, 0},
+    comp.Transform:new(
+        Vec2:new(0, 0),
+        Vec2:new(0, 0)
+    ),
+    comp.Sprite:from_path("res/images/player_animations/samurai/run.png"),
+    comp.Hitbox:late(),
+    comp.CameraAnchor:new(0.2),
+    comp.Controllable:new()
 )
+
+processed_chunks = {}
 
 -- globals
 local debug_rects = {}
-
--- functions
-local function apply_scroll(dt)
-    local m = 0.04
-    fake_scroll.x = fake_scroll.x + (player.pos.x - fake_scroll.x - WIDTH / 2 + 15) * m
-    fake_scroll.y = fake_scroll.y + (player.pos.y - fake_scroll.y - HEIGHT / 2 + 15) * m
-    scroll.x = math.floor(fake_scroll.x)
-    scroll.y = math.floor(fake_scroll.y)
-end
 
 -- love callbacks
 function love.keypressed(key)
@@ -71,17 +65,11 @@ function love.update(dt)
     _G.debug_info = {}
     _G.dt = dt
 
-    apply_scroll(dt)
+    processed_chunks = world:update(dt, systems._singletons.scroll)
 
-    local processed_chunks = world:update(dt, scroll)
-    player:update(dt)
-
-    -- model:update()
     bench:start(Color.CYAN)
 
-    -- relocate -> physics -> rendering
-    systems.relocate:process(processed_chunks)
-    -- debug_rects = systems.physics:process(processed_chunks)
+    systems:process_misc_systems(processed_chunks)
 
     bench:finish(Color.CYAN)
 end
@@ -89,10 +77,10 @@ end
 -- love draw
 function love.draw()
     love.graphics.push()
-    love.graphics.translate(-scroll.x, -scroll.y)
 
-    -- update the main components: world and player
-    world:draw(scroll)
+    systems.camera:process(processed_chunks)
+
+    world:draw(systems._singletons.scroll)
 
     -- debug hitboxes
     for _, rect in ipairs(debug_rects) do
@@ -101,9 +89,6 @@ function love.draw()
     end
 
     love.graphics.pop()
-
-    -- update misc objects
-    -- model:draw()
 
     -- FPS, debug, etc.
     bench:draw()
@@ -119,10 +104,6 @@ function love.draw()
         love.graphics.print(debug_type .. ": " .. debug_value, 6, 80 + y * 22)
         y = y + 1
     end
-
-    -- love.graphics.setShader(shaders.lighting)
-    -- love.graphics.rectangle("fill", 400, 100, 69, 69)
-    -- love.graphics.setShader(nil)
 
     love.graphics.setColor(1, 1, 1, 1)
 end

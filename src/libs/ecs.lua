@@ -39,7 +39,7 @@ function ecs:_get_components(chunk, ...)
             table.insert(possible_entities, component_manager.components[chunk][comp_name])
         end
     end
-
+    
     -- intersect them
     local intersected_entities = commons.intersect_n(commons.unpack(possible_entities))
 
