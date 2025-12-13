@@ -8,16 +8,17 @@ local comp = require("src.components")
 local systems = require("src.systems")
 local fonts = require("src.fonts")
 local commons = require("src.libs.commons")
+local yaml = require("src.libs.yaml")
 
 -- constants
 local VIEW_PADDING = 15
-local MAX_LIGHT = 15
+local MAX_LIGHT = 16
 
 -- WORLD CLASS
 local World = {}
 World.__index = World
 
---[[\
+--[[
     key = "1,0" (chunk key)
     chunk_pos = {1, 0}
     rel_x, rel_y = 1..CW, 1..CH
@@ -34,6 +35,7 @@ function World:new()
     obj.lightmap = {}
     obj.light_surf = nil
     obj.lighting = false
+    obj.light_frame = 0
 
     obj.batch = love.graphics.newSpriteBatch(blocks.sprs, 1000)
     obj.bg_batch = love.graphics.newSpriteBatch(blocks.sprs, 1000)
@@ -41,11 +43,42 @@ function World:new()
 
     obj.x_seed = love.math.random()
     obj.y_seed = love.math.random()
+    obj.x_seed = 1.2
+    obj.y_seed = 2.4
     obj.processed_chunks = {}
+
+    obj:load_structures()
 
     love.math.setRandomSeed(obj.x_seed)
 
     return obj
+end
+
+function World:check_timbre(key, block_x, block_y)
+    return self.data
+    and self.data[key]
+    and self.data[key][block_x]
+    and self.data[key][block_x][block_y]
+    ~= nil
+end
+
+function World:load_structures()
+    self.structures = {}
+
+    local content, _ = love.filesystem.read("res/data/structures.yaml")
+    self.structures = yaml.eval(content)
+
+end
+
+function World:place_structure(structure, key, x, y)
+    for _, block_data in ipairs(self.structures[structure]) do
+        self:set(
+            key,
+            x + block_data[1],
+            y + block_data[2],
+            block_data[3]
+        )
+    end
 end
 
 function World:process_keypress(key)
@@ -112,7 +145,6 @@ function World:create_chunk(cx, cy)
         }) - 0.5) * 32)
         local dirt_height = ground_height + 16
 
-
         for rel_y = 1, CH do
             -- the final data that will be saved
             -- EVERYTHING ABOVE SOIL LEVEL IS AIR BY DEFAULT
@@ -140,8 +172,9 @@ function World:create_chunk(cx, cy)
                         name = biome.dirt
                     end
                     bg_name = biome.dirt
+                    
                 else
-                    if noise < 0.8 then
+                    if noise < 0.7 then
                         name = self:get_ore()
                     end
                     bg_name = "stone"
@@ -262,7 +295,7 @@ function World:modify_chunk(key)
                     end
                     self:set(key, x, y - 1, flower)
                 end
-              
+
                 -- tree
                 if chance(1 / 15) then
                     local tree_height = love.math.random(4, 16)
@@ -307,8 +340,8 @@ function World:modify_chunk(key)
                 end
 
                 -- entities
-                if chance(1 / 1) then
-                    for i = 1, 10 do
+                if chance(1 / 1001010101) then
+                    for i = 1, 1 do
                         ecs:create_entity(
                             key,
                             comp.Transform:new(
@@ -319,6 +352,25 @@ function World:modify_chunk(key)
                             comp.Hitbox:late()
                         )
                     end
+                end
+
+                if chance(1 / 10) then
+                    ecs:create_entity(
+                        key,
+                        comp.Transform:new(
+                            Vec2:new(abs_x * BS, (abs_y - 3) * BS),
+                            Vec2:new(0, 0),
+                            0
+                        ),
+                        comp.Sprite:from_path("res/images/mobs/bee/walk.png"),
+                        comp.Hitbox:late(),
+                        comp.PlayerFollower:new()
+                    )
+                end
+
+                if chance(1 / 10) then
+                    -- self:set(key, x, y - 3, "dynamite")
+                    self:place_structure("well", key, x, y)
                 end
             end
 
@@ -334,7 +386,7 @@ function World:modify_chunk(key)
                 local walk_y = y
                 for _ = 1, num_walks do
                     self:set(key, walk_x, walk_y, "base-ore", true)
-                    r = love.math.random(1, 4)
+                    local r = love.math.random(1, 4)
                     if r == 1 then walk_x = walk_x + 1 end
                     if r == 2 then walk_x = walk_x - 1 end
                     if r == 3 then walk_y = walk_y + 1 end
@@ -427,7 +479,12 @@ function World:update(dt, scroll)
 end
 
 function World:propagate_lighting(scroll)
-    local last = love.timer.getTime()
+    self.light_frame = self.light_frame + 1
+    if self.light_frame ~= 1 then
+        return
+    end
+    self.light_frame = 0
+
     -- determine bounds
     local min_x = math.floor(scroll.x / BS) - VIEW_PADDING
     local max_x = math.floor((scroll.x + WIDTH) / BS) + VIEW_PADDING
@@ -483,7 +540,7 @@ function World:propagate_lighting(scroll)
             table.insert(self.processed_chunks, commons.key(x, y))
         end
     end
- 
+
     -- BFS
     local steps = 0
     bench:start(Color.YELLOW)
@@ -508,8 +565,6 @@ function World:propagate_lighting(scroll)
         end
     end
     bench:finish(Color.YELLOW)
-
-    -- print((love.timer.getTime() - last)*1000 .. "ms")
 
     _G.debug_info["light steps"] = steps
 
@@ -538,6 +593,8 @@ function World:draw(scroll)
     local prints = {}
     local num_rendered_tiles = 0
 
+    local last = love.timer.getTime()
+
     for ty = min_y, max_y do
         for tx = min_x, max_x do
             -- get the (bg) tile and (bg) name of the block given absolute coordinates
@@ -545,6 +602,12 @@ function World:draw(scroll)
             local bg_tile = self:abs_pos_to_bg_tile(tx, ty)
             local name = blocks.name[tile]
             local bg_name = blocks.name[bg_tile]
+
+            -- get light value
+            local light = (self.lightmap[ty] and self.lightmap[ty][tx]) or 0
+            local norm_light = light / MAX_LIGHT
+
+            -- goto continue
 
             -- if there is foreground, draw that. Else, if background, draw that
             if tile ~= nil and name ~= "air" then
@@ -579,6 +642,8 @@ function World:draw(scroll)
             end
 
             love.graphics.setColor(Color.WHITE)
+
+            ::continue::
         end
     end
 
@@ -600,7 +665,7 @@ function World:draw(scroll)
 
     -- update the player
     self.player:draw(scroll)
-    
+
     -- render the entities (render here so they work with the lightings)
     local num_rendered_entities = systems.render:process(self.processed_chunks)
 
@@ -616,7 +681,6 @@ function World:draw(scroll)
 
     if self.lighting then
         self.light_surf = love.graphics.newImage(self.light_surf)
-        -- self.light_surf:setFilter("nearest", "nearest")
         love.graphics.draw(self.light_surf, scroll.x + lighting_offset.x, scroll.y + lighting_offset.y, 0, BS, BS)
     end
 

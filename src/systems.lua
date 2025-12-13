@@ -5,9 +5,10 @@ local anim = require("src.animation")
 
 -- S Y S T E M S
 local systems = {
-    render = {},
-    physics = {},
     relocate = {},
+    physics = {},
+    render = {},
+    player_follower = {}
 }
 
 function systems.render:process(chunks)
@@ -17,7 +18,7 @@ function systems.render:process(chunks)
         local _, _, tr, sprite = commons.unpack(entry)
 
         local anim_data = anim.get(sprite.anim_skin, sprite.anim_mode)
-        
+
         sprite.anim = sprite.anim + anim_data.speed * _G.dt
         if sprite.anim > anim_data.frames + 1 then
             sprite.anim = 1
@@ -48,7 +49,7 @@ function systems.physics:process(chunks)
         if hitbox ~= nil then
             if hitbox.late then
                 local anim_data = anim.get(sprite.anim_skin, sprite.anim_mode)
-                local x, y, w, h = anim_data.quads[math.floor(sprite.anim)]:getViewport()
+                local _, _, w, h = anim_data.quads[math.floor(sprite.anim)]:getViewport()
                 -- account for pixel art scaling
                 hitbox.w = w * S
                 hitbox.h = h * S
@@ -61,7 +62,7 @@ function systems.physics:process(chunks)
                 tr.pos.y + hitbox.h / 2
             )) do
                 local block_hitbox = comp.Hitbox:new(BS, BS)
-                
+
                 table.insert(debug_rects, {block_pos.x, block_pos.y, BS, BS, {1, 0.7, 0}})
 
                 -- entity hitbox against block hitbox
@@ -100,6 +101,11 @@ function systems.relocate:process(chunks)
     end
 end
 
+function systems.player_follower:process(chunks)
+    for _, entry in ipairs(ecs:get_compnents(chunks, comp.Transform)) do
+        pprint(entry)
+    end
+end
 
 
 

@@ -1,6 +1,15 @@
 local Vec2 = require("src.libs.vec2")
 
 -- C O M P O N E N T S
+local PlayerFollower = {}
+PlayerFollower.__index = PlayerFollower
+PlayerFollower._name = "PlayerFollower"
+
+function PlayerFollower:new()
+    local obj = setmetatable({}, PlayerFollower)
+    return obj
+end
+
 local Transform = {}
 Transform.__index = Transform
 Transform._name = "Transform"
@@ -83,7 +92,7 @@ local comp = {
     Transform = Transform,
     Sprite = Sprite,
     Hitbox = Hitbox,
+    PlayerFollower = PlayerFollower,
 }
-
 
 return comp

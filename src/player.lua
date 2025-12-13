@@ -4,6 +4,7 @@ local Color = require("src.color")
 local comp = require("src.components")
 local anim = require("src.animation")
 local blocks = require("src.blocks")
+local commons = require("src.libs.commons")
 
 -- constants
 BlockAction = {
@@ -71,6 +72,11 @@ function Player:process_mousepressed(mouse_x, mouse_y, button)
         local key, block_x, block_y = self.world:mouse_to_timbre(mouse_x, mouse_y, self.scroll)
         local current = blocks.name[self.world:get(key, block_x, block_y)]
 
+        -- debug
+        local mx, my = love.mouse.getPosition()
+        love.graphics.setColor(Color.BLACK)
+        love.graphics.print(key, 0, 0, mx, my)
+
         if current == nil or bwand(current, BF.EMPTY) then
             self.block_action = BlockAction.PLACE
         else
@@ -87,7 +93,7 @@ end
 
 function Player:update(dt, scroll)
     self:move(dt)
-    self:interact(scroll)
+    self:interact()
 end
 
 function Player:draw(scroll)
@@ -139,7 +145,9 @@ function Player:interact()
         local key, block_x, block_y = self.world:mouse_to_timbre(mouse_x, mouse_y, self.scroll)
 
         if self.block_action == BlockAction.BREAK then
-            self.world:break_(key, block_x, block_y)
+            if self.world:check_timbre(key, block_x, block_y) then
+                self.world:break_(key, block_x, block_y)
+            end
 
         elseif self.block_action == BlockAction.PLACE then
             self.world:place(key, block_x, block_y, "torch")

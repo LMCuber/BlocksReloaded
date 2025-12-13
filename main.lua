@@ -70,7 +70,7 @@ end
 function love.update(dt)
     _G.debug_info = {}
     _G.dt = dt
-    
+
     apply_scroll(dt)
 
     local processed_chunks = world:update(dt, scroll)
@@ -79,8 +79,9 @@ function love.update(dt)
     -- model:update()
     bench:start(Color.CYAN)
 
+    -- relocate -> physics -> rendering
     systems.relocate:process(processed_chunks)
-    debug_rects = systems.physics:process(processed_chunks)
+    -- debug_rects = systems.physics:process(processed_chunks)
 
     bench:finish(Color.CYAN)
 end
@@ -91,7 +92,7 @@ function love.draw()
     love.graphics.translate(-scroll.x, -scroll.y)
 
     -- update the main components: world and player
-    local num_rendered_tiles, num_rendered_entities = world:draw(scroll)
+    world:draw(scroll)
 
     -- debug hitboxes
     for _, rect in ipairs(debug_rects) do
@@ -118,6 +119,10 @@ function love.draw()
         love.graphics.print(debug_type .. ": " .. debug_value, 6, 80 + y * 22)
         y = y + 1
     end
+
+    -- love.graphics.setShader(shaders.lighting)
+    -- love.graphics.rectangle("fill", 400, 100, 69, 69)
+    -- love.graphics.setShader(nil)
 
     love.graphics.setColor(1, 1, 1, 1)
 end
