@@ -340,32 +340,32 @@ function World:modify_chunk(key)
                 end
 
                 -- entities
-                if chance(1 / 1001010101) then
-                    for i = 1, 1 do
-                        ecs:create_entity(
-                            key,
-                            comp.Transform:new(
-                                Vec2:new(abs_x * BS, (abs_y - 7 - i) * BS),
-                                Vec2:new(0, 0)
-                            ),
-                            comp.Sprite:from_path("res/images/statics/portal/idle.png"),
-                            comp.Hitbox:late()
-                        )
-                    end
-                end
+                -- if chance(1 / 1001010101) then
+                --     for i = 1, 1 do
+                --         ecs:create_entity(
+                --             key,
+                --             comp.Transform:new(
+                --                 Vec2:new(abs_x * BS, (abs_y - 7 - i) * BS),
+                --                 Vec2:new(0, 0)
+                --             ),
+                --             comp.Sprite:from_path("res/images/statics/portal/idle.png"),
+                --             comp.Hitbox:late()
+                --         )
+                --     end
+                -- end
 
-                if chance(1 / 10) then
-                    ecs:create_entity(
-                        key,
-                        comp.Transform:new(
-                            Vec2:new(abs_x * BS, (abs_y - 3) * BS),
-                            Vec2:new(0, 0),
-                            0
-                        ),
-                        comp.Sprite:from_path("res/images/mobs/bee/walk.png"),
-                        comp.Hitbox:late()
-                    )
-                end
+                -- if chance(1 / 10) then
+                --     ecs:create_entity(
+                --         key,
+                --         comp.Transform:new(
+                --             Vec2:new(abs_x * BS, (abs_y - 3) * BS),
+                --             Vec2:new(0, 0),
+                --             0
+                --         ),
+                --         comp.Sprite:from_path("res/images/mobs/bee/walk.png"),
+                --         comp.Hitbox:late()
+                --     )
+                -- end
 
                 if chance(1 / 10) then
                     -- self:set(key, x, y - 3, "dynamite")
@@ -539,6 +539,7 @@ function World:propagate_lighting(scroll)
             table.insert(self.processed_chunks, commons.key(x, y))
         end
     end
+    self.processed_chunks = {"0,0"}
 
     -- BFS
     local steps = 0

@@ -8,6 +8,12 @@ function _G.test(...)
     print(love.math.random(0, 999), ...)
 end
 
+function _G.iprint(tbl)
+    for _, elem in ipairs(tbl) do
+        print(elem)
+    end
+end
+
 function _G.pprint(tbl, indent)
     indent = indent or 0
     local formatting = string.rep("  ", indent)
@@ -20,7 +26,9 @@ function _G.pprint(tbl, indent)
     print(formatting .. "{")
     for k, v in pairs(tbl) do
         local key = tostring(k)
-        if type(v) == "table" then
+        if type(v) == "table"
+            and tbl._name == nil
+            then
             io.write(formatting .. "  " .. key .. " = ")
             pprint(v, indent + 1)
         else
@@ -30,7 +38,7 @@ function _G.pprint(tbl, indent)
     print(formatting .. "}" .. "  " .. "(#" .. #tbl .. ")")
 end
 
-function _G.hbar()
+function _G.bar()
     print("----------------------------------------------------------------------")
 end
 

@@ -14,7 +14,7 @@ end
 
 local CameraAnchor = {}
 CameraAnchor.__index = CameraAnchor
-CameraAnchor._name = "Transform"
+CameraAnchor._name = "CameraAnchor"
 
 function CameraAnchor:new(speed)
     local obj = setmetatable({speed = speed}, CameraAnchor)
