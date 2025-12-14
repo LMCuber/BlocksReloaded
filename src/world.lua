@@ -34,7 +34,7 @@ function World:new()
     obj.bg_data = {}
     obj.lightmap = {}
     obj.light_surf = nil
-    obj.lighting = false
+    obj.lighting = true
     obj.light_frame = 0
 
     obj.batch = love.graphics.newSpriteBatch(blocks.sprs, 1000)
@@ -508,18 +508,18 @@ function World:propagate_lighting(scroll)
     bench:start(Color.RED)
     for ty = min_y, max_y do
         for tx = min_x, max_x do
-            -- -- lighting stuff
-            local name = blocks.name[self:abs_pos_to_tile(tx, ty)]
-            local bg_name = blocks.name[self:abs_pos_to_bg_tile(tx, ty)]
+    --         -- -- lighting stuff
+    --         local name = blocks.name[self:abs_pos_to_tile(tx, ty)]
+    --         local bg_name = blocks.name[self:abs_pos_to_bg_tile(tx, ty)]
 
-            -- propagate light if the block is a light source
-            if (name == "air" and bg_name == "air") or (name ~= "air" and bwand(name, BF.LIGHT_SOURCE)) then
-                self.lightmap[ty][tx] = MAX_LIGHT
-                tail = tail + 1
-                qx[tail], qy[tail], ql[tail] = tx, ty, MAX_LIGHT
-            else
-                self.lightmap[ty][tx] = 0
-            end
+    --         -- propagate light if the block is a light source
+    --         if (name == "air" and bg_name == "air") or (name ~= "air" and bwand(name, BF.LIGHT_SOURCE)) then
+    --             self.lightmap[ty][tx] = MAX_LIGHT
+    --             tail = tail + 1
+    --             qx[tail], qy[tail], ql[tail] = tx, ty, MAX_LIGHT
+    --         else
+    --             self.lightmap[ty][tx] = 0
+    --         end
 
             -- save the topleft and bottomright chunks
             if tx == min_x and ty == min_y then
@@ -539,31 +539,30 @@ function World:propagate_lighting(scroll)
             table.insert(self.processed_chunks, commons.key(x, y))
         end
     end
-    self.processed_chunks = {"0,0"}
 
     -- BFS
     local steps = 0
     bench:start(Color.YELLOW)
-    while head <= tail do
-        local x, y, lv = qx[head], qy[head], ql[head]
-        head = head + 1
-        local n = {
-            {x + 1, y}, {x - 1, y}, {x, y + 1}, {x, y - 1}
-        }
-        for i = 1, #n do
-            local nx, ny = n[i][1], n[i][2]
-            if self.lightmap[ny] and self.lightmap[ny][nx] ~= nil then
-                local decay = 1
-                local pass_lv = lv - decay
-                if pass_lv > (self.lightmap[ny][nx] or 0) and pass_lv > 0 then
-                    steps = steps + 1
-                    self.lightmap[ny][nx] = pass_lv
-                    tail = tail + 1
-                    qx[tail], qy[tail], ql[tail] = nx, ny, pass_lv
-                end
-            end
-        end
-    end
+    -- while head <= tail do
+    --     local x, y, lv = qx[head], qy[head], ql[head]
+    --     head = head + 1
+    --     local n = {
+    --         {x + 1, y}, {x - 1, y}, {x, y + 1}, {x, y - 1}
+    --     }
+    --     for i = 1, #n do
+    --         local nx, ny = n[i][1], n[i][2]
+    --         if self.lightmap[ny] and self.lightmap[ny][nx] ~= nil then
+    --             local decay = 1
+    --             local pass_lv = lv - decay
+    --             if pass_lv > (self.lightmap[ny][nx] or 0) and pass_lv > 0 then
+    --                 steps = steps + 1
+    --                 self.lightmap[ny][nx] = pass_lv
+    --                 tail = tail + 1
+    --                 qx[tail], qy[tail], ql[tail] = nx, ny, pass_lv
+    --             end
+    --         end
+    --     end
+    -- end
     bench:finish(Color.YELLOW)
 
     _G.debug_info["light steps"] = steps
@@ -679,10 +678,10 @@ function World:draw(scroll)
         love.graphics.print(chunk_key, chunk_x + CW * BS / 2, chunk_y + CH * BS / 2)
     end
 
-    if self.lighting then
-        self.light_surf = love.graphics.newImage(self.light_surf)
-        love.graphics.draw(self.light_surf, scroll.x + lighting_offset.x, scroll.y + lighting_offset.y, 0, BS, BS)
-    end
+    -- if self.lighting then
+    --     self.light_surf = love.graphics.newImage(self.light_surf)
+    --     love.graphics.draw(self.light_surf, scroll.x + lighting_offset.x, scroll.y + lighting_offset.y, 0, BS, BS)
+    -- end
 
     love.graphics.setColor(Color.WHITE)
 
@@ -693,7 +692,6 @@ function World:draw(scroll)
 end
 
 local world = World:new()
-
-systems.physics.world = world
+systems._misc.physics.world = world
 
 return world

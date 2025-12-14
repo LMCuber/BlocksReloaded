@@ -2,6 +2,7 @@
 local ecs = require("src.libs.ecs")
 local commons = require("src.libs.commons")
 local Vec2 = require("src.libs.vec2")
+local Color = require("src.color")
 --
 local comp = require("src.components")
 local anim = require("src.animation")
@@ -11,6 +12,7 @@ local systems = {
     _misc = {
         relocate = {},
         controllable = {},
+        physics = {},
     },
 
     _singletons = {
@@ -18,7 +20,6 @@ local systems = {
         scroll = Vec2:new(0, 0)
     },
 
-    physics = {},
     render = {},
     camera = {},
 }
@@ -33,7 +34,7 @@ function systems.render:process(chunks)
     local num_rendered = 0
 
     for _, entry in ipairs(ecs:get_components(chunks, comp.Transform, comp.Sprite)) do
-        local _, _, tr, sprite = commons.unpack(entry)
+        local ent_id, key, tr, sprite = commons.unpack(entry)
 
         local anim_data = anim.get(sprite.anim_skin, sprite.anim_mode)
 
@@ -45,13 +46,25 @@ function systems.render:process(chunks)
 
         love.graphics.draw(anim_data.sprs, quad, tr.pos.x, tr.pos.y, 0, S, S)
 
+        -- DEBUGGING
+        -- chunk text
+        love.graphics.setColor(Color.ORANGE)
+        love.graphics.print(key, tr.pos.x + 30, tr.pos.y - 34)
+        
+        -- rendering location
+        local hitbox = ecs:try_component(ent_id, comp.Hitbox)
+        if hitbox ~= nil then
+            love.graphics.setColor(Color.CYAN)
+            love.graphics.rectangle("line", tr.pos.x, tr.pos.y, hitbox.w, hitbox.h)
+        end
+            
         num_rendered = num_rendered + 1
     end
 
     return num_rendered
 end
 
-function systems.physics:process(chunks)
+function systems._misc.physics:process(chunks)
     local debug_rects = {}
 
     for _, entry in ipairs(ecs:get_components(chunks, comp.Transform, comp.Sprite)) do
@@ -83,7 +96,7 @@ function systems.physics:process(chunks)
 
                 table.insert(debug_rects, {block_pos.x, block_pos.y, BS, BS, {1, 0.7, 0}})
 
-                -- entity hitbox against block hitbox
+                -- entity hitbox against block hitbox (block hitbox is the argument)
                 if hitbox:aabb(tr.pos.x, tr.pos.y, block_hitbox, block_pos.x, block_pos.y) then
                     if tr.vel.y > 0 then
                         tr.pos.y = block_pos.y - hitbox.h

@@ -18,13 +18,12 @@ player.scroll = scroll
 player.bench = bench
 world.player = player
 
--- player entity
+-- create the player entity
 ecs:create_entity(
     "0,0",
     comp.Transform:new(
-        Vec2:new(0, 0),
-        Vec2:new(0, 0),
-        0
+        Vec2:new(400, 400),
+        Vec2:new(0, 0)
     ),
     comp.Sprite:from_path("res/images/player_animations/samurai/run.png"),
     comp.Hitbox:late(),
