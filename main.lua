@@ -23,11 +23,12 @@ ecs:create_entity(
     "0,0",
     comp.Transform:new(
         Vec2:new(400, 400),
-        Vec2:new(0, 0)
+        Vec2:new(0, 0),
+        1
     ),
-    comp.Sprite:from_path("res/images/player_animations/samurai/run.png"),
-    comp.Hitbox:late(),
-    comp.CameraAnchor:new(0.2),
+    comp.Sprite:from_path("res/images/player_animations/samurai/idle.png"),
+    comp.Hitbox:new(52, 80),
+    comp.CameraAnchor:new(0.05),
     comp.Controllable:new()
 )
 

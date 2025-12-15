@@ -32,7 +32,8 @@ function Transform:new(pos, vel, gravity, sines, rot, rot_vel)
 
     obj.pos = pos
     obj.vel = vel
-    obj.gravity = gravity or _G.GRAVITY
+    obj.direc = 1
+    obj.gravity = (gravity or 1) * _G.GRAVITY
     obj.acc = Vec2:new(0, 0)
     obj.active = true
     obj.sines = Vec2:new(0, 0)
@@ -86,10 +87,10 @@ function Hitbox:new(w, h)
     return obj
 end
 
-function Hitbox:late()
+function Hitbox:dynamic()
     local obj = setmetatable({}, Hitbox)
 
-    obj.late = true
+    obj.is_dynamic = true
 
     return obj
 end

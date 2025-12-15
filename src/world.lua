@@ -349,7 +349,7 @@ function World:modify_chunk(key)
                 --                 Vec2:new(0, 0)
                 --             ),
                 --             comp.Sprite:from_path("res/images/statics/portal/idle.png"),
-                --             comp.Hitbox:late()
+                --             comp.Hitbox:dynamic()
                 --         )
                 --     end
                 -- end
@@ -363,7 +363,7 @@ function World:modify_chunk(key)
                 --             0
                 --         ),
                 --         comp.Sprite:from_path("res/images/mobs/bee/walk.png"),
-                --         comp.Hitbox:late()
+                --         comp.Hitbox:dynamic()
                 --     )
                 -- end
 
