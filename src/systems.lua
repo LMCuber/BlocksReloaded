@@ -7,23 +7,28 @@ local comp = require("src.components")
 local anim = require("src.animation")
 local Color = require("src.color")
 local fonts = require("src.fonts")
+local blocks = require("src.blocks")
 
 -- S Y S T E M S
 local systems = {
     _misc = {
         relocate = {},
-        controllable = {},
         physics = {},
     },
 
     _singletons = {
         fake_scroll = Vec2:new(0, 0),
-        scroll = Vec2:new(0, 0)
+        scroll = Vec2:new(0, 0),
+        mouse = {x = nil, y = nil, buttons = {}},
     },
 
+    events = {},
     render = {},
     camera = {},
+    controllable = {},
 }
+
+--
 
 function systems:process_misc_systems(chunks)
     for _, system in pairs(systems._misc) do
@@ -169,31 +174,13 @@ function systems.camera:process(chunks)
     end
 end
 
--- M I S C E L L A N E O U S  S Y S T E M S -------------------------------------------------------
+function systems.controllable:process(chunks, world)
+    local mouse = systems._singletons.mouse
+    local Intent = comp.Intent
 
-function systems._misc.relocate:process(chunks)
-    for _, entry in ipairs(ecs:get_components(chunks, comp.Transform)) do
-        local ent_id, chunk, tr = commons.unpack(entry)
-
-        local chunk_x, chunk_y = commons.parse_key(chunk)
-        local perc_x = ((tr.pos.x / BS) - (chunk_x * CW)) / CW
-        local perc_y = ((tr.pos.y / BS) - (chunk_y * CH)) / CH
-
-        if perc_x < 0 then
-            ecs:relocate_entity(ent_id, chunk, chunk_x - 1, chunk_y)
-        elseif perc_x >= 1 then
-            ecs:relocate_entity(ent_id, chunk, chunk_x + 1, chunk_y)
-        elseif perc_y < 0 then
-            ecs:relocate_entity(ent_id, chunk, chunk_x, chunk_y - 1)
-        elseif perc_y >= 1 then
-            ecs:relocate_entity(ent_id, chunk, chunk_x, chunk_y + 1)
-        end
-    end
-end
-
-function systems._misc.controllable:process(chunks)
     for _, entry in ipairs(ecs:get_components(chunks, comp.Controllable, comp.Sprite, comp.Transform)) do
-        local _, _, _, sprite, tr = commons.unpack(entry)
+        -- controlling movement with keyboard
+        local _, _, ctrl, sprite, tr = commons.unpack(entry)
 
         if love.keyboard.isDown("a") or love.keyboard.isDown("d") then
             sprite.anim_mode = "run"
@@ -212,6 +199,61 @@ function systems._misc.controllable:process(chunks)
 
         if love.keyboard.isDown("w") then
             tr.vel.y = -650
+        end
+
+        if love.mouse.isDown(1) then
+            local key, block_x, block_y = world:mouse_to_timbre(mouse.x, mouse.y, systems._singletons.scroll)
+            local current = blocks.name[world:get(key, block_x, block_y)]
+
+            -- debug
+            local mx, my = love.mouse.getPosition()
+            love.graphics.setColor(Color.BLACK)
+            love.graphics.print(key, 0, 0, mx, my)
+
+            -- check if already pressing or not
+            if current == nil or bwand(current, BF.EMPTY) then
+                if ctrl.intent == Intent.NONE then
+                    ctrl.intent = Intent.PLACE
+                end
+                print(1)
+                if ctrl.intent == Intent.PLACE then
+                    print(2)
+                    world:place(key, block_x, block_y, "torch")
+                end
+            else
+               print()
+            end
+        else
+            ctrl.intent = Intent.NONE
+        end
+    end
+end
+
+function systems.events:process()
+    -- local x, y = love.mouse.getPosition()
+    -- systems._singletons.mouse = {
+    --     x = x, y = y, buttons = {}
+    -- }
+end
+
+-- M I S C E L L A N E O U S  S Y S T E M S -------------------------------------------------------
+
+function systems._misc.relocate:process(chunks)
+    for _, entry in ipairs(ecs:get_components(chunks, comp.Transform)) do
+        local ent_id, chunk, tr = commons.unpack(entry)
+
+        local chunk_x, chunk_y = commons.parse_key(chunk)
+        local perc_x = ((tr.pos.x / BS) - (chunk_x * CW)) / CW
+        local perc_y = ((tr.pos.y / BS) - (chunk_y * CH)) / CH
+
+        if perc_x < 0 then
+            ecs:relocate_entity(ent_id, chunk, chunk_x - 1, chunk_y)
+        elseif perc_x >= 1 then
+            ecs:relocate_entity(ent_id, chunk, chunk_x + 1, chunk_y)
+        elseif perc_y < 0 then
+            ecs:relocate_entity(ent_id, chunk, chunk_x, chunk_y - 1)
+        elseif perc_y >= 1 then
+            ecs:relocate_entity(ent_id, chunk, chunk_x, chunk_y + 1)
         end
     end
 end

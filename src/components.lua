@@ -5,8 +5,17 @@ local Controllable = {}
 Controllable.__index = Controllable
 Controllable._name = "Controllable"
 
+local Intent = {
+    NONE  = 0,
+    PLACE = 1,
+    BREAK = 2,
+}
+
 function Controllable:new()
-    local obj = setmetatable({}, Controllable)
+    local obj = setmetatable({
+        mouse_held = false,
+        intent = Intent.NONE,
+    }, Controllable)
     return obj
 end
 
@@ -114,6 +123,7 @@ local comp = {
     Hitbox = Hitbox,
     CameraAnchor = CameraAnchor,
     Controllable = Controllable,
+    Intent = Intent,
 }
 
 return comp

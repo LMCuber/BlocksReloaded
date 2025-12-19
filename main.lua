@@ -48,11 +48,11 @@ function love.keypressed(key)
 end
 
 function love.mousepressed(mouse_x, mouse_y, button)
-    player:process_mousepressed(mouse_x, mouse_y, button)
+    -- systems:set_mouse(mouse_x, mouse_y, button)
 end
 
 function love.mousereleased(mouse_x, mouse_y, button)
-    player:process_mousereleased(mouse_x, mouse_y, button)
+    -- systems:unset_mouse(button)
 end
 
 -- love load
@@ -79,7 +79,9 @@ end
 function love.draw()
     love.graphics.push()
 
+    systems.events:process()
     systems.camera:process(processed_chunks)
+    systems.controllable:process(processed_chunks, world)
 
     world:draw(systems._singletons.scroll)
 
