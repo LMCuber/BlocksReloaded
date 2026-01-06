@@ -40,11 +40,13 @@ local systems = {
             [Button.MOUSE_5] = default_key_data(),
         },
         keys = {},
+        late_rects = {},
     },
     singletons = {},
     render = {},
     camera = {},
     controllable = {},
+    late_rects = {},
 }
 -- shorthand
 local sg = systems._singletons
@@ -195,6 +197,7 @@ function systems.camera:process(chunks)
 
         sg.fake_scroll.x = sg.fake_scroll.x + (tr.pos.x - sg.fake_scroll.x - WIDTH / 2 + 15) * cam.speed
         sg.fake_scroll.y = sg.fake_scroll.y + (tr.pos.y - sg.fake_scroll.y - HEIGHT / 2 + 15) * cam.speed
+
         sg.scroll.x = math.floor(sg.fake_scroll.x)
         sg.scroll.y = math.floor(sg.fake_scroll.y)
         love.graphics.translate(-sg.scroll.x, -sg.scroll.y)
@@ -235,8 +238,7 @@ function systems.controllable:process(chunks, world)
         local chunk_x, chunk_y = commons.parse_key(key)
         local rect_x = (chunk_x * CW + block_x - 1) * BS  -- bc 1-based indexing
         local rect_y = (chunk_y * CH + block_y - 1) * BS
-        love.graphics.setColor(Color.ORANGE)
-        love.graphics.rectangle("line", rect_x, rect_y, BS, BS)
+        table.insert(sg.late_rects, {rect_x, rect_y, BS, BS, Color.ORANGE})
 
         if sg.buttons[Button.LEFT].clicked then
             if current == nil or bwand(current, BF.EMPTY) then
@@ -278,6 +280,16 @@ function systems.singletons:process()
         state.was_down = state.down
         state.down = is_down
     end
+end
+
+function systems.late_rects:process()
+    -- draw all the late rects to the screen
+    for _, rect in ipairs(sg.late_rects) do
+        love.graphics.setColor(rect[5])
+        love.graphics.rectangle("line", rect[1], rect[2], rect[3], rect[4])
+    end
+    -- clear the late rects
+    sg.late_rects = {}
 end
 
 -- M I S C E L L A N E O U S  S Y S T E M S -------------------------------------------------------

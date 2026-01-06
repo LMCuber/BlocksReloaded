@@ -10,11 +10,13 @@ local world = require("src.world")
 local fonts = require("src.fonts")
 local systems = require("src.systems")
 
--- dependency injection
+---------------------------------------------------------------------
+
 _G.bench = Benchmarker:new(200)
 _G.debug_info = {}
 
--- create the player entity
+---------------------------------------------------------------------
+
 ecs:create_entity(
     "0,0",
     comp.Transform:new(
@@ -33,29 +35,19 @@ processed_chunks = {}
 -- globals
 local debug_rects = {}
 
--- love callbacks
+---------------------------------------------------------------------
+
 function love.keypressed(key)
     if key == "escape" then
         love.event.quit()
     end
-
     world:process_keypress(key)
 end
 
-function love.mousepressed(mouse_x, mouse_y, button)
-    -- systems:set_mouse(mouse_x, mouse_y, button)
-end
-
-function love.mousereleased(mouse_x, mouse_y, button)
-    -- systems:unset_mouse(button)
-end
-
--- love load
 function love.load()
     love.graphics.setBackgroundColor(1, 1, 1, 0)
 end
 
--- love update
 function love.update(dt)
     _G.debug_info = {}
     _G.dt = dt
@@ -69,15 +61,32 @@ function love.update(dt)
     bench:finish(Color.CYAN)
 end
 
--- love draw
+---------------------------------------------------------------------
+
+local function show_debug_info()
+    local y = 0
+    for debug_type, debug_value in pairs(_G.debug_info) do
+        love.graphics.print(debug_type .. ": " .. debug_value, 6, 80 + y * 22)
+        y = y + 1
+    end
+end
+
 function love.draw()
+    -- from now on, all rendered entities are rendered with camera scroll
     love.graphics.push()
 
+    -- process all singleton entities (must be updated before the rest of the systems)
     systems.singletons:process()
     systems.camera:process(processed_chunks)
+
+    -- render world AFTER camera
+    world:draw(systems._singletons.scroll)
+
+    -- controllable system (accessing world block data)
     systems.controllable:process(processed_chunks, world)
 
-    world:draw(systems._singletons.scroll)
+    -- debugging rects
+    systems.late_rects:process()
 
     -- debug hitboxes
     for _, rect in ipairs(debug_rects) do
@@ -96,11 +105,7 @@ function love.draw()
 
     love.graphics.setFont(fonts.orbitron[18])
 
-    local y = 0
-    for debug_type, debug_value in pairs(_G.debug_info) do
-        love.graphics.print(debug_type .. ": " .. debug_value, 6, 80 + y * 22)
-        y = y + 1
-    end
+    show_debug_info()
 
     love.graphics.setColor(1, 1, 1, 1)
 end

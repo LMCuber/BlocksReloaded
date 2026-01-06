@@ -12,7 +12,6 @@ local yaml = require("src.libs.yaml")
 
 -- constants
 local VIEW_PADDING = 15
-local MAX_LIGHT = 16
 
 -- WORLD CLASS
 local World = {}
@@ -145,6 +144,7 @@ function World:create_chunk(cx, cy)
             octaves = 1,
         }) - 0.5) * 32)
         local dirt_height = ground_height + 16
+        local zero_height = 512
 
         for rel_y = 1, CH do
             -- the final data that will be saved
@@ -175,11 +175,15 @@ function World:create_chunk(cx, cy)
                     bg_name = biome.dirt
 
 
-                else
+                elseif block_y <= zero_height then
+                    -- cave
                     if noise < 0.7 then
                         name = self:get_ore()
                     end
                     bg_name = "stone"
+                else
+                    -- limit
+                    name = "blackstone"
                 end
             end
 
@@ -199,7 +203,10 @@ end
 
 function World:get_ore()
     local r = love.math.random()
-    if r <= 0.02 then
+    if false then
+    elseif r <= 0.01 then
+        return "base-core"
+    elseif r <= 0.02 then
         return "base-ore"
     end
     return "stone"
@@ -469,19 +476,47 @@ function World:place(key, block_x, block_y, name)
 end
 
 function World:break_(key, block_x, block_y)
+    local name = blocks.name[self.data[key][block_x][block_y]]
+    if bwand(name, BF.UNBREAKABLE) then
+        return
+    end
     self.data[key][block_x][block_y] = blocks.id["air"]
 end
 
 function World:update(dt, scroll)
+    self:get_processed_chunks(scroll)
     if self.lighting then
         self:propagate_lighting(scroll)
     end
     return self.processed_chunks
 end
 
+function World:get_processed_chunks(scroll)  -- side effect: updates self.processed_chunks
+    self.processed_chunks = {}
+
+    -- determine bounds
+    local min_x = math.floor(scroll.x / BS) - VIEW_PADDING
+    local max_x = math.floor((scroll.x + WIDTH) / BS) + VIEW_PADDING
+    local min_y = math.floor(scroll.y / BS) - VIEW_PADDING
+    local max_y = math.floor((scroll.y + HEIGHT) / BS) + VIEW_PADDING
+
+    -- save the topleft and bottomright chunks
+    local chunk_topleft = self:abs_pos_to_chunk(min_x, min_y)
+    local chunk_bottomright = self:abs_pos_to_chunk(max_x, max_y)
+
+    -- get the intermediate chunks
+    local safety = 1
+    for y = chunk_topleft.y - safety, chunk_bottomright.y + safety do
+        for x = chunk_topleft.x - safety, chunk_bottomright.x + safety do
+            table.insert(self.processed_chunks, commons.key(x, y))
+        end
+    end
+end
+
 function World:propagate_lighting(scroll)
     self.light_frame = self.light_frame + 1
-    if self.light_frame ~= 1 then
+    if self.light_frame ~= 10 then
+        _G.debug_info["light steps"] = 0
         return
     end
     self.light_frame = 0
@@ -491,10 +526,6 @@ function World:propagate_lighting(scroll)
     local max_x = math.floor((scroll.x + WIDTH) / BS) + VIEW_PADDING
     local min_y = math.floor(scroll.y / BS) - VIEW_PADDING
     local max_y = math.floor((scroll.y + HEIGHT) / BS) + VIEW_PADDING
-
-    -- empty processed chunks
-    self.processed_chunks = {}
-    local chunk_topleft, chunk_bottomright
 
     -- reset lightmap and light surface
     self.lightmap = {}
@@ -507,70 +538,62 @@ function World:propagate_lighting(scroll)
     local head, tail = 1, 0
 
     -- init air tiles
+    local grid_repr = {}
+    local grid_repr_bg = {}
     bench:start(Color.RED)
     for ty = min_y, max_y do
+        grid_repr[ty] = {}
+        grid_repr_bg[ty] = {}
+
         for tx = min_x, max_x do
-    --         -- -- lighting stuff
-    --         local name = blocks.name[self:abs_pos_to_tile(tx, ty)]
-    --         local bg_name = blocks.name[self:abs_pos_to_bg_tile(tx, ty)]
+            -- -- lighting stuff
+            local name = blocks.name[self:abs_pos_to_tile(tx, ty)]
+            local bg_name = blocks.name[self:abs_pos_to_bg_tile(tx, ty)]
 
-    --         -- propagate light if the block is a light source
-    --         if (name == "air" and bg_name == "air") or (name ~= "air" and bwand(name, BF.LIGHT_SOURCE)) then
-    --             self.lightmap[ty][tx] = MAX_LIGHT
-    --             tail = tail + 1
-    --             qx[tail], qy[tail], ql[tail] = tx, ty, MAX_LIGHT
-    --         else
-    --             self.lightmap[ty][tx] = 0
-    --         end
+            grid_repr[ty][tx] = name
+            grid_repr_bg[ty][tx] = bg_name
 
-            -- save the topleft and bottomright chunks
-            if tx == min_x and ty == min_y then
-                chunk_topleft = self:abs_pos_to_chunk(tx, ty)
-            elseif tx == max_x and ty == max_y then
-                chunk_bottomright = self:abs_pos_to_chunk(tx, ty)
+            -- propagate light if the block is a light source
+            if (name == "air" and bg_name == "air") or (name ~= "air" and bwand(name, BF.LIGHT_SOURCE)) then
+                self.lightmap[ty][tx] = MAX_LIGHT
+                tail = tail + 1
+                qx[tail], qy[tail], ql[tail] = tx, ty, MAX_LIGHT
+            else
+                self.lightmap[ty][tx] = 0
             end
-
         end
     end
     bench:finish(Color.RED)
 
-    -- -- from the topleft and topright chunks, get intermediate chunks
-    local safe = 1
-    for y = chunk_topleft.y - safe, chunk_bottomright.y + safe do
-        for x = chunk_topleft.x - safe, chunk_bottomright.x + safe do
-            table.insert(self.processed_chunks, commons.key(x, y))
-        end
-    end
-
     -- BFS
     local steps = 0
     bench:start(Color.YELLOW)
-    -- while head <= tail do
-    --     local x, y, lv = qx[head], qy[head], ql[head]
-    --     head = head + 1
-    --     local n = {
-    --         {x + 1, y}, {x - 1, y}, {x, y + 1}, {x, y - 1}
-    --     }
-    --     for i = 1, #n do
-    --         local nx, ny = n[i][1], n[i][2]
-    --         if self.lightmap[ny] and self.lightmap[ny][nx] ~= nil then
-    --             local decay = 1
-    --             local pass_lv = lv - decay
-    --             if pass_lv > (self.lightmap[ny][nx] or 0) and pass_lv > 0 then
-    --                 steps = steps + 1
-    --                 self.lightmap[ny][nx] = pass_lv
-    --                 tail = tail + 1
-    --                 qx[tail], qy[tail], ql[tail] = nx, ny, pass_lv
-    --             end
-    --         end
-    --     end
-    -- end
+    while head <= tail do
+        local x, y, lv = qx[head], qy[head], ql[head]
+        head = head + 1
+        local n = {
+            {x + 1, y}, {x - 1, y}, {x, y + 1}, {x, y - 1}
+        }
+        for i = 1, #n do
+            local nx, ny = n[i][1], n[i][2]
+            if self.lightmap[ny] and self.lightmap[ny][nx] ~= nil then
+                -- local name = grid_repr[ny][nx]
+                -- local decay = blocks.light_decay[name] or 1  -- in case I missed an entry
+                local decay = 0.8
+
+                local pass_lv = lv - decay
+                if pass_lv > (self.lightmap[ny][nx] or 0) and pass_lv > 0 then
+                    steps = steps + 1
+                    self.lightmap[ny][nx] = pass_lv
+                    tail = tail + 1
+                    qx[tail], qy[tail], ql[tail] = nx, ny, pass_lv
+                end
+            end
+        end
+    end
     bench:finish(Color.YELLOW)
 
     _G.debug_info["light steps"] = steps
-
-    -- return the processed chunks
-    return self.processed_chunks
 end
 
 function World:draw(scroll)
@@ -595,7 +618,7 @@ function World:draw(scroll)
     local num_rendered_tiles = 0
 
     local last = love.timer.getTime()
-
+    
     for ty = min_y, max_y do
         for tx = min_x, max_x do
             -- get the (bg) tile and (bg) name of the block given absolute coordinates
@@ -658,26 +681,24 @@ function World:draw(scroll)
     love.graphics.setColor(Color.WHITE)
     love.graphics.draw(self.batch)
 
-    -- update the player
-    -- self.player:draw(scroll)
-
     -- render the entities (render here so they work with the lightings)
     local num_rendered_entities = systems.render:process(self.processed_chunks)
 
     -- render chunk border rectangles (visual)
-    for _, chunk_key in ipairs(self.processed_chunks) do
-        love.graphics.setColor(Color.CYAN)
-        local chunk_x, chunk_y = commons.parse_key(chunk_key)
-        chunk_x = chunk_x * CW * BS
-        chunk_y = chunk_y * CH * BS
-        love.graphics.rectangle("line", chunk_x, chunk_y, CW * BS, CH * BS)
-        love.graphics.print(chunk_key, chunk_x + CW * BS / 2, chunk_y + CH * BS / 2)
-    end
-
-    -- if self.lighting then
-    --     self.light_surf = love.graphics.newImage(self.light_surf)
-    --     love.graphics.draw(self.light_surf, scroll.x + lighting_offset.x, scroll.y + lighting_offset.y, 0, BS, BS)
+    -- for _, chunk_key in ipairs(self.processed_chunks) do
+    --     love.graphics.setColor(Color.CYAN)
+    --     local chunk_x, chunk_y = commons.parse_key(chunk_key)
+    --     chunk_x = chunk_x * CW * BS
+    --     chunk_y = chunk_y * CH * BS
+    --     love.graphics.rectangle("line", chunk_x, chunk_y, CW * BS, CH * BS)
+    --     love.graphics.print(chunk_key, chunk_x + CW * BS / 2, chunk_y + CH * BS / 2)
     -- end
+
+    if self.lighting then
+        self.light_surf = love.graphics.newImage(self.light_surf)
+        -- self.light_surf:setFilter("nearest", "nearest")
+        love.graphics.draw(self.light_surf, scroll.x + lighting_offset.x, scroll.y + lighting_offset.y, 0, BS, BS)
+    end
 
     love.graphics.setColor(Color.WHITE)
 
