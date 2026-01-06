@@ -13,10 +13,6 @@ local systems = require("src.systems")
 -- dependency injection
 _G.bench = Benchmarker:new(200)
 _G.debug_info = {}
-local player = Player:new(world)
-player.scroll = scroll
-player.bench = bench
-world.player = player
 
 -- create the player entity
 ecs:create_entity(
@@ -28,8 +24,8 @@ ecs:create_entity(
     ),
     comp.Sprite:from_path("res/images/player_animations/samurai/idle.png"),
     comp.Hitbox:new(52, 80),
-    comp.CameraAnchor:new(0.05),
-    comp.Controllable:new()
+    comp.CameraAnchor:new(0.05),  -- camera follows its position
+    comp.Controllable:new()       -- can move using keyboard
 )
 
 processed_chunks = {}
@@ -44,7 +40,6 @@ function love.keypressed(key)
     end
 
     world:process_keypress(key)
-    player:process_keypress(key)
 end
 
 function love.mousepressed(mouse_x, mouse_y, button)
@@ -58,7 +53,6 @@ end
 -- love load
 function love.load()
     love.graphics.setBackgroundColor(1, 1, 1, 0)
-    player.pos.y = BS * (CH * 1)
 end
 
 -- love update
@@ -79,7 +73,7 @@ end
 function love.draw()
     love.graphics.push()
 
-    systems.events:process()
+    systems.singletons:process()
     systems.camera:process(processed_chunks)
     systems.controllable:process(processed_chunks, world)
 

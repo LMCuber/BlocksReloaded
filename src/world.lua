@@ -141,7 +141,8 @@ function World:create_chunk(cx, cy)
         local ground_height = math.floor(32 + (self:octave_noise({
             x = block_x,
             y = 1,
-            freq = biome.freq
+            freq = biome.freq,
+            octaves = 1,
         }) - 0.5) * 32)
         local dirt_height = ground_height + 16
 
@@ -160,7 +161,7 @@ function World:create_chunk(cx, cy)
                     freq = 0.02,
                     pers = 0.5,
                     lac = 2,
-                    octaves = 2,
+                    octaves = 3,
                     -- worm = false,
                     worm = true,
                 })
@@ -172,7 +173,8 @@ function World:create_chunk(cx, cy)
                         name = biome.dirt
                     end
                     bg_name = biome.dirt
-                    
+
+
                 else
                     if noise < 0.7 then
                         name = self:get_ore()
@@ -379,6 +381,7 @@ function World:modify_chunk(key)
                     and self:get(key, x - 1, y) ~= nil and nbwand(blocks.name[self:get(key, x - 1, y)], BF.ORE)
                     and self:get(key, x, y + 1) ~= nil and nbwand(blocks.name[self:get(key, x, y + 1)], BF.ORE)
                     and self:get(key, x, y - 1) ~= nil and nbwand(blocks.name[self:get(key, x, y - 1)], BF.ORE) then
+
                 -- simple 2D brownian motion
                 local num_walks = love.math.random(3, 7)
                 local walk_x = x
@@ -394,7 +397,6 @@ function World:modify_chunk(key)
             end
         end
     end
-
     return chunk
 end
 
@@ -621,10 +623,6 @@ function World:draw(scroll)
 
             -- only overlay block with darkness if the block itself is not a light source
             if self.lighting then
-                -- get light value
-                local light = (self.lightmap[ty] and self.lightmap[ty][tx]) or 0
-
-                local norm_light = light / 15
                 if nbwand(name, BF.LIGHT_SOURCE) or (name == "air" and bg_name ~= "air") then
                         self.light_surf:setPixel(
                         tx - min_x, ty - min_y,
@@ -641,8 +639,6 @@ function World:draw(scroll)
             end
 
             love.graphics.setColor(Color.WHITE)
-
-            ::continue::
         end
     end
 

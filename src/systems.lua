@@ -10,6 +10,18 @@ local fonts = require("src.fonts")
 local blocks = require("src.blocks")
 
 -- S Y S T E M S
+local Button = {
+    LEFT = 1,
+    RIGHT = 2,
+    MIDDLE = 3,
+    MOUSE_4 = 4,
+    MOUSE_5 = 5,
+}
+
+local function default_key_data()
+    return {down = false, was_down = false, clicked = false}
+end
+
 local systems = {
     _misc = {
         relocate = {},
@@ -19,16 +31,31 @@ local systems = {
     _singletons = {
         fake_scroll = Vec2:new(0, 0),
         scroll = Vec2:new(0, 0),
-        mouse = {x = nil, y = nil, buttons = {}},
+        mouse = {x = nil, y = nil},
+        buttons = {
+            [Button.LEFT]    = default_key_data(),
+            [Button.RIGHT]   = default_key_data(),
+            [Button.MIDDLE]  = default_key_data(),
+            [Button.MOUSE_4] = default_key_data(),
+            [Button.MOUSE_5] = default_key_data(),
+        },
+        keys = {},
     },
-
-    events = {},
+    singletons = {},
     render = {},
     camera = {},
     controllable = {},
 }
+-- shorthand
+local sg = systems._singletons
 
---
+-- keyboard map
+local alphabet = "abcdefghijklmnopqrstuvwxyz"
+for i = 1, #alphabet do
+    local char = alphabet:sub(i, i)
+    sg.keys[char] = default_key_data()
+end
+
 
 function systems:process_misc_systems(chunks)
     for _, system in pairs(systems._misc) do
@@ -166,74 +193,91 @@ function systems.camera:process(chunks)
     for _, entry in ipairs(ecs:get_components(chunks, comp.CameraAnchor, comp.Transform)) do
         local _, _, cam, tr = commons.unpack(entry)
 
-        systems._singletons.fake_scroll.x = systems._singletons.fake_scroll.x + (tr.pos.x - systems._singletons.fake_scroll.x - WIDTH / 2 + 15) * cam.speed
-        systems._singletons.fake_scroll.y = systems._singletons.fake_scroll.y + (tr.pos.y - systems._singletons.fake_scroll.y - HEIGHT / 2 + 15) * cam.speed
-        systems._singletons.scroll.x = math.floor(systems._singletons.fake_scroll.x)
-        systems._singletons.scroll.y = math.floor(systems._singletons.fake_scroll.y)
-        love.graphics.translate(-systems._singletons.scroll.x, -systems._singletons.scroll.y)
+        sg.fake_scroll.x = sg.fake_scroll.x + (tr.pos.x - sg.fake_scroll.x - WIDTH / 2 + 15) * cam.speed
+        sg.fake_scroll.y = sg.fake_scroll.y + (tr.pos.y - sg.fake_scroll.y - HEIGHT / 2 + 15) * cam.speed
+        sg.scroll.x = math.floor(sg.fake_scroll.x)
+        sg.scroll.y = math.floor(sg.fake_scroll.y)
+        love.graphics.translate(-sg.scroll.x, -sg.scroll.y)
     end
 end
 
 function systems.controllable:process(chunks, world)
-    local mouse = systems._singletons.mouse
     local Intent = comp.Intent
 
     for _, entry in ipairs(ecs:get_components(chunks, comp.Controllable, comp.Sprite, comp.Transform)) do
         -- controlling movement with keyboard
         local _, _, ctrl, sprite, tr = commons.unpack(entry)
 
-        if love.keyboard.isDown("a") or love.keyboard.isDown("d") then
+        if sg.keys["a"].down or sg.keys["d"].down then
             sprite.anim_mode = "run"
         else
             sprite.anim_mode = "idle"
             tr.vel.x = 0
         end
 
-        if love.keyboard.isDown("a") then
+        if sg.keys["a"].down then
             tr.vel.x = -350
             tr.direc = -1
-        elseif love.keyboard.isDown("d") then
+        elseif sg.keys["d"].down then
             tr.vel.x = 350
             tr.direc = 1
         end
 
-        if love.keyboard.isDown("w") then
-            tr.vel.y = -650
+        if sg.keys["w"].clicked then
+            tr.vel.y = -810
         end
 
-        if love.mouse.isDown(1) then
-            local key, block_x, block_y = world:mouse_to_timbre(mouse.x, mouse.y, systems._singletons.scroll)
-            local current = blocks.name[world:get(key, block_x, block_y)]
+        local mx, my = sg.mouse.x, sg.mouse.y
+        local key, block_x, block_y = world:mouse_to_timbre(mx, my, sg.scroll)
+        local current = blocks.name[world:get(key, block_x, block_y)]
 
-            -- debug
-            local mx, my = love.mouse.getPosition()
-            love.graphics.setColor(Color.BLACK)
-            love.graphics.print(key, 0, 0, mx, my)
+        -- visual block hover rectangle
+        local chunk_x, chunk_y = commons.parse_key(key)
+        local rect_x = (chunk_x * CW + block_x - 1) * BS  -- bc 1-based indexing
+        local rect_y = (chunk_y * CH + block_y - 1) * BS
+        love.graphics.setColor(Color.ORANGE)
+        love.graphics.rectangle("line", rect_x, rect_y, BS, BS)
 
-            -- check if already pressing or not
+        if sg.buttons[Button.LEFT].clicked then
             if current == nil or bwand(current, BF.EMPTY) then
-                if ctrl.intent == Intent.NONE then
-                    ctrl.intent = Intent.PLACE
-                end
-                print(1)
-                if ctrl.intent == Intent.PLACE then
-                    print(2)
+                ctrl.intent = Intent.PLACE
+            else
+                ctrl.intent = Intent.BREAK
+            end
+        end
+
+        if (sg.buttons[Button.LEFT].down) then
+            if ctrl.intent == Intent.PLACE then
+                if current == nil or bwand(current, BF.EMPTY) then
                     world:place(key, block_x, block_y, "torch")
                 end
-            else
-               print()
+            elseif ctrl.intent == Intent.BREAK then
+                world:break_(key, block_x, block_y)
             end
-        else
-            ctrl.intent = Intent.NONE
         end
     end
 end
 
-function systems.events:process()
-    -- local x, y = love.mouse.getPosition()
-    -- systems._singletons.mouse = {
-    --     x = x, y = y, buttons = {}
-    -- }
+function systems.singletons:process()
+    -- mouse position
+    local _x, _y = love.mouse.getPosition()
+    sg.mouse = {x = _x, y = _y}
+
+    -- all keys
+    for key, state in pairs(sg.keys) do
+        local is_down = love.keyboard.isDown(key)
+        state.clicked = is_down and not state.down
+        state.was_down = state.down
+        state.down = is_down
+    end
+
+    -- all button presses AND holds
+    for button_id, state in pairs(sg.buttons) do
+        local is_down = love.mouse.isDown(button_id)  -- e.g. 1 or 3
+        state.clicked = is_down and not state.down
+        state.was_down = state.down
+        state.down = is_down
+    end
 end
 
 -- M I S C E L L A N E O U S  S Y S T E M S -------------------------------------------------------
