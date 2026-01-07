@@ -11,7 +11,7 @@ local commons = require("src.libs.commons")
 local yaml = require("src.libs.yaml")
 
 -- constants
-local VIEW_PADDING = 15
+local VIEW_PADDING = MAX_LIGHT
 
 -- WORLD CLASS
 local World = {}
@@ -618,7 +618,7 @@ function World:draw(scroll)
     local num_rendered_tiles = 0
 
     local last = love.timer.getTime()
-    
+
     for ty = min_y, max_y do
         for tx = min_x, max_x do
             -- get the (bg) tile and (bg) name of the block given absolute coordinates

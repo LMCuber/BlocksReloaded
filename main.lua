@@ -5,6 +5,7 @@ local Vec2 = require("src.libs.vec2")
 local Benchmarker = require("src.libs.benchmarker")
 local ecs = require("src.libs.ecs")
 local comp = require("src.components")
+local Model = require("src.3d_model")
 -- 
 local world = require("src.world")
 local fonts = require("src.fonts")
@@ -30,10 +31,21 @@ ecs:create_entity(
     comp.Controllable:new()       -- can move using keyboard
 )
 
-processed_chunks = {}
-
--- globals
+local processed_chunks = {}
 local debug_rects = {}
+
+
+
+    -- -- mandatory arguments
+    -- obj.obj_path = kwargs.obj_path
+    -- obj.center = kwargs.center
+    -- obj.size = kwargs.size
+
+local model = Model:new({
+    obj_path = "res/models/sphere.obj",
+    center = Vec2:new(200, 200),
+    size = 100,
+})
 
 ---------------------------------------------------------------------
 
@@ -54,6 +66,8 @@ function love.update(dt)
 
     processed_chunks = world:update(dt, systems._singletons.scroll)
 
+    model:update()
+
     bench:start(Color.CYAN)
 
     systems:process_misc_systems(processed_chunks)
@@ -72,6 +86,9 @@ local function show_debug_info()
 end
 
 function love.draw()
+    love.graphics.setColor({0.14, 0.12, 0.24})
+    love.graphics.rectangle("fill", 0, 0, WIDTH, HEIGHT)
+
     -- from now on, all rendered entities are rendered with camera scroll
     love.graphics.push()
 
@@ -98,6 +115,7 @@ function love.draw()
 
     -- FPS, debug, etc.
     bench:draw()
+    model:draw()
 
     love.graphics.setColor(Color.ORANGE)
     love.graphics.setFont(fonts.orbitron[24])
