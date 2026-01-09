@@ -1,10 +1,11 @@
 function love.conf(t)
     t.window.width = 1200
+    -- t.window.width = 920
     t.window.height = 720
     -- t.window.width = 800
     -- t.window.height = 600
-    t.window.width = 2700
-    t.window.height = 1080
+    -- t.window.width = 2700
+    -- t.window.height = 1080
     -- t.window.width = 1680
     -- t.window.height = 1050
     t.window.title = "Blocks Reloaded"

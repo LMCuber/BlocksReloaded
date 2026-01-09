@@ -349,19 +349,21 @@ function World:modify_chunk(key)
                 end
 
                 -- entities
-                -- if chance(1 / 1001010101) then
-                --     for i = 1, 1 do
-                --         ecs:create_entity(
-                --             key,
-                --             comp.Transform:new(
-                --                 Vec2:new(abs_x * BS, (abs_y - 7 - i) * BS),
-                --                 Vec2:new(0, 0)
-                --             ),
-                --             comp.Sprite:from_path("res/images/statics/portal/idle.png"),
-                --             comp.Hitbox:dynamic()
-                --         )
-                --     end
-                -- end
+                if chance(1 / 1) and key == "2,1" then
+                    print("CREAAAAATION!!")
+                    for i = 1, 1 do
+                        ecs:create_entity(
+                            key,
+                            comp.Transform:new(
+                                Vec2:new(abs_x * BS, (abs_y - 7 - i) * BS),
+                                Vec2:new(0, 0),
+                                0
+                            ),
+                            comp.Sprite:from_path("res/images/statics/portal/idle.png"),
+                            comp.Hitbox:dynamic()
+                        )
+                    end
+                end
 
                 -- if chance(1 / 10) then
                 --     ecs:create_entity(
@@ -685,18 +687,19 @@ function World:draw(scroll)
     local num_rendered_entities = systems.render:process(self.processed_chunks)
 
     -- render chunk border rectangles (visual)
-    -- for _, chunk_key in ipairs(self.processed_chunks) do
-    --     love.graphics.setColor(Color.CYAN)
-    --     local chunk_x, chunk_y = commons.parse_key(chunk_key)
-    --     chunk_x = chunk_x * CW * BS
-    --     chunk_y = chunk_y * CH * BS
-    --     love.graphics.rectangle("line", chunk_x, chunk_y, CW * BS, CH * BS)
-    --     love.graphics.print(chunk_key, chunk_x + CW * BS / 2, chunk_y + CH * BS / 2)
-    -- end
+    for _, chunk_key in ipairs(self.processed_chunks) do
+        love.graphics.setColor(Color.CYAN)
+        local chunk_x, chunk_y = commons.parse_key(chunk_key)
+        chunk_x = chunk_x * CW * BS
+        chunk_y = chunk_y * CH * BS
+        love.graphics.rectangle("line", chunk_x, chunk_y, CW * BS, CH * BS)
+        love.graphics.setFont(fonts.orbitron[20])
+        love.graphics.print(chunk_key, chunk_x + CW * BS / 2, chunk_y + CH * BS / 2)
+    end
 
     if self.lighting then
         self.light_surf = love.graphics.newImage(self.light_surf)
-        -- self.light_surf:setFilter("nearest", "nearest")
+        self.light_surf:setFilter("nearest", "nearest")
         love.graphics.draw(self.light_surf, scroll.x + lighting_offset.x, scroll.y + lighting_offset.y, 0, BS, BS)
     end
 

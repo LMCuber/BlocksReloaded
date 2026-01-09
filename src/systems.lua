@@ -69,7 +69,7 @@ function systems.render:process(chunks)
     local num_rendered = 0
 
     for _, entry in ipairs(ecs:get_components(chunks, comp.Transform, comp.Sprite)) do
-        local ent_id, _, tr, sprite = commons.unpack(entry)
+        local ent_id, chunk, tr, sprite = commons.unpack(entry)
 
         local anim_data = anim.get(sprite.anim_skin, sprite.anim_mode)
 
@@ -91,6 +91,11 @@ function systems.render:process(chunks)
         if hitbox == nil then
             love.graphics.draw(anim_data.sprs, quad, tr.pos.x, tr.pos.y, 0, S, S)
         else
+            -- important check. we can't rely on race conditions between system updates
+            if hitbox.is_dynamic then
+                goto continue
+            end
+
             local draw_x = math.floor(tr.pos.x - (img_w - hitbox.w) / 2)
             local draw_y = math.floor(tr.pos.y - (img_h - hitbox.h) / 2)
 
@@ -104,6 +109,11 @@ function systems.render:process(chunks)
                 (tr.direc == -1 and -1 or 1) * S,
                 S
             )
+           
+            -- chunk
+            love.graphics.setFont(fonts.orbitron[12])
+            love.graphics.setColor(Color.CYAN)
+            love.graphics.print(chunk, tr.pos.x, tr.pos.y - 60)
 
             -- image border (image render location)
             love.graphics.setColor(Color.ORANGE)
@@ -119,6 +129,8 @@ function systems.render:process(chunks)
         end
 
         num_rendered = num_rendered + 1
+
+        ::continue::
     end
 
     return num_rendered
@@ -137,6 +149,7 @@ function systems._misc.physics:process(chunks)
             -- account for pixel art scaling
             hitbox.w = w * S
             hitbox.h = h * S
+            hitbox.is_dynamic = false
         end
 
         -- y-collision

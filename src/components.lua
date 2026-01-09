@@ -92,6 +92,7 @@ function Hitbox:new(w, h)
     local obj = setmetatable({}, Hitbox)
 
     obj.w, obj.h = w, h
+    obj.is_dynamic = false
 
     return obj
 end

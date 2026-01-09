@@ -14,32 +14,48 @@ function _G.iprint(tbl)
     end
 end
 
-function _G.pprint(tbl, indent)
+-- LLM code
+function _G.pprint(value, indent, visited)
     indent = indent or 0
-    local formatting = string.rep("  ", indent)
+    visited = visited or {}
 
-    if type(tbl) ~= "table" then
-        print(formatting .. tostring(tbl))
+    local spacing = string.rep("  ", indent)
+
+    if type(value) ~= "table" then
+        print(spacing .. tostring(value))
         return
     end
 
-    print(formatting .. "{")
-    for k, v in pairs(tbl) do
-        local key = tostring(k)
-        if type(v) == "table"
-            and tbl._name == nil
-            then
-            io.write(formatting .. "  " .. key .. " = ")
-            pprint(v, indent + 1)
+    if visited[value] then
+        print(spacing .. "<circular reference>")
+        return
+    end
+
+    visited[value] = true
+    print(spacing .. "{")
+
+    for k, v in pairs(value) do
+        local key
+        if type(k) == "string" then
+            key = string.format("%q", k)
         else
-            print(formatting .. "  " .. key .. " = " .. tostring(v))
+            key = tostring(k)
+        end
+
+        io.write(spacing .. "  [" .. key .. "] = ")
+
+        if type(v) == "table" then
+            pprint(v, indent + 1, visited)
+        else
+            print(tostring(v))
         end
     end
-    print(formatting .. "}" .. "  " .. "(#" .. #tbl .. ")")
+
+    print(spacing .. "}")
 end
 
 function _G.bar()
-    print("----------------------------------------------------------------------")
+    print("--------------------------------------------------------------------------------------")
 end
 
 -- useful functions
@@ -54,6 +70,16 @@ end
 
 function commons.round_to(x, step)
     return math.floor(x / step + 0.5) * step
+end
+
+function commons.cartesian(a, b)
+    local result = {}
+    for i = 1, #a do
+        for j = 1, #b do
+            table.insert(result, {a[i], b[j]})
+        end
+    end
+    return result
 end
 
 function commons.intersect_n(...)
@@ -135,6 +161,16 @@ end
 
 function commons.startswith(str, prefix)
     return str:sub(1, #prefix) == prefix
+end
+
+function commons.filter(tbl, predicate)
+    local result = {}
+    for i, v in ipairs(tbl) do
+        if predicate(v) then
+            table.insert(result, v)
+        end
+    end
+    return result
 end
 
 function commons.map(tbl, func)

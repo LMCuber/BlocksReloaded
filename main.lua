@@ -6,6 +6,7 @@ local Benchmarker = require("src.libs.benchmarker")
 local ecs = require("src.libs.ecs")
 local comp = require("src.components")
 local Model = require("src.3d_model")
+local neat = require("src.libs.neat")
 -- 
 local world = require("src.world")
 local fonts = require("src.fonts")
@@ -35,16 +36,15 @@ local processed_chunks = {}
 local debug_rects = {}
 
 
-
-    -- -- mandatory arguments
-    -- obj.obj_path = kwargs.obj_path
-    -- obj.center = kwargs.center
-    -- obj.size = kwargs.size
-
+-- -- mandatory arguments
+-- obj.obj_path = kwargs.obj_path
+-- obj.center = kwargs.center
+-- obj.size = kwargs.size
 local model = Model:new({
-    obj_path = "res/models/sphere.obj",
+    obj_path = "res/models/bracelet.obj",
     center = Vec2:new(200, 200),
-    size = 100,
+    size = 24,
+    light = {0, -1, 0}
 })
 
 ---------------------------------------------------------------------
@@ -60,13 +60,17 @@ function love.load()
     love.graphics.setBackgroundColor(1, 1, 1, 0)
 end
 
+-------
+
 function love.update(dt)
     _G.debug_info = {}
     _G.dt = dt
 
     processed_chunks = world:update(dt, systems._singletons.scroll)
 
-    model:update()
+    -- model.light[1] = math.cos(6*love.timer.getTime())
+    -- model.light[2] = math.sin(6*love.timer.getTime())
+    -- model:update()
 
     bench:start(Color.CYAN)
 
@@ -115,7 +119,7 @@ function love.draw()
 
     -- FPS, debug, etc.
     bench:draw()
-    model:draw()
+    -- model:draw()
 
     love.graphics.setColor(Color.ORANGE)
     love.graphics.setFont(fonts.orbitron[24])

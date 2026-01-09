@@ -27,17 +27,22 @@ function ecs:_get_components(chunk, ...)
         return {}
     end
 
+
+
     local comp_types = {...}
 
     -- get all possible collection of entities (based on component type) before intersecting them
     local possible_entities = {}
-
     for _, comp_type in ipairs(comp_types) do
         local comp_name = comp_type._name
+        local ent_set = component_manager.components[chunk][comp_name]
 
-        if component_manager.components[chunk][comp_name] ~= nil then
-            table.insert(possible_entities, component_manager.components[chunk][comp_name])
+        -- if the given chunk has no entities of the given component <comp_name>, then there can be no entity which has an intersection of the given components. return nothing
+        if not ent_set then
+            return {}
         end
+
+        table.insert(possible_entities, component_manager.components[chunk][comp_name])
     end
 
     -- intersect them

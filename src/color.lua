@@ -8,6 +8,7 @@ local Color = {
     OLIVE      = {0.39, 0.42, 0.18},
     LIME       = {0.53, 0.91, 0.53},
     YELLOW     = {0.92, 0.75, 0.30},
+    PURPLE     = {0.62, 0.14, 0.80},
 }
 
 return Color
