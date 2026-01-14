@@ -11,8 +11,7 @@ local commons = require("src.libs.commons")
 local yaml = require("src.libs.yaml")
 
 -- constants
-local VIEW_PADDING = 15
-local MAX_LIGHT = 16
+local VIEW_PADDING = MAX_LIGHT
 
 -- WORLD CLASS
 local World = {}
@@ -34,7 +33,7 @@ function World:new()
     obj.bg_data = {}
     obj.lightmap = {}
     obj.light_surf = nil
-    obj.lighting = false
+    obj.lighting = true
     obj.light_frame = 0
 
     obj.batch = love.graphics.newSpriteBatch(blocks.sprs, 1000)
@@ -141,9 +140,11 @@ function World:create_chunk(cx, cy)
         local ground_height = math.floor(32 + (self:octave_noise({
             x = block_x,
             y = 1,
-            freq = biome.freq
+            freq = biome.freq,
+            octaves = 1,
         }) - 0.5) * 32)
         local dirt_height = ground_height + 16
+        local zero_height = 512
 
         for rel_y = 1, CH do
             -- the final data that will be saved
@@ -160,7 +161,7 @@ function World:create_chunk(cx, cy)
                     freq = 0.02,
                     pers = 0.5,
                     lac = 2,
-                    octaves = 2,
+                    octaves = 3,
                     -- worm = false,
                     worm = true,
                 })
@@ -172,12 +173,17 @@ function World:create_chunk(cx, cy)
                         name = biome.dirt
                     end
                     bg_name = biome.dirt
-                    
-                else
+
+
+                elseif block_y <= zero_height then
+                    -- cave
                     if noise < 0.7 then
                         name = self:get_ore()
                     end
                     bg_name = "stone"
+                else
+                    -- limit
+                    name = "blackstone"
                 end
             end
 
@@ -197,7 +203,10 @@ end
 
 function World:get_ore()
     local r = love.math.random()
-    if r <= 0.02 then
+    if false then
+    elseif r <= 0.01 then
+        return "base-core"
+    elseif r <= 0.02 then
         return "base-ore"
     end
     return "stone"
@@ -318,7 +327,7 @@ function World:modify_chunk(key)
                 end
 
                 -- pyramid
-                if chance(1 / 40) then
+                if chance(1 / 120) then
                     local pyr_height = love.math.random(6, 20)
                     local pyr_offset = love.math.random(1, pyr_height / 4)
                     for yo = 0, pyr_height do
@@ -340,7 +349,7 @@ function World:modify_chunk(key)
                 end
 
                 -- entities
-                if chance(1 / 1001010101) then
+                if chance(1 / 100) then
                     for i = 1, 1 do
                         ecs:create_entity(
                             key,
@@ -349,9 +358,21 @@ function World:modify_chunk(key)
                                 Vec2:new(0, 0)
                             ),
                             comp.Sprite:from_path("res/images/statics/portal/idle.png"),
-                            comp.Hitbox:late()
+                            comp.Hitbox:dynamic()
                         )
                     end
+                end
+
+                if chance(1 / 120) then
+                    ecs:create_entity(
+                        key,
+                        comp.Transform:new(
+                            Vec2:new(abs_x * BS, (abs_y - 7) * BS),
+                            Vec2:new(200, 0)
+                        ),
+                        comp.Sprite:from_path("res/images/mobs/chicken/walk.png"),
+                        comp.Hitbox:dynamic()
+                    )
                 end
 
                 if chance(1 / 10) then
@@ -363,8 +384,7 @@ function World:modify_chunk(key)
                             0
                         ),
                         comp.Sprite:from_path("res/images/mobs/bee/walk.png"),
-                        comp.Hitbox:late(),
-                        comp.PlayerFollower:new()
+                        comp.Hitbox:dynamic()
                     )
                 end
 
@@ -380,6 +400,7 @@ function World:modify_chunk(key)
                     and self:get(key, x - 1, y) ~= nil and nbwand(blocks.name[self:get(key, x - 1, y)], BF.ORE)
                     and self:get(key, x, y + 1) ~= nil and nbwand(blocks.name[self:get(key, x, y + 1)], BF.ORE)
                     and self:get(key, x, y - 1) ~= nil and nbwand(blocks.name[self:get(key, x, y - 1)], BF.ORE) then
+
                 -- simple 2D brownian motion
                 local num_walks = love.math.random(3, 7)
                 local walk_x = x
@@ -395,7 +416,6 @@ function World:modify_chunk(key)
             end
         end
     end
-
     return chunk
 end
 
@@ -468,19 +488,47 @@ function World:place(key, block_x, block_y, name)
 end
 
 function World:break_(key, block_x, block_y)
+    local name = blocks.name[self.data[key][block_x][block_y]]
+    if bwand(name, BF.UNBREAKABLE) then
+        return
+    end
     self.data[key][block_x][block_y] = blocks.id["air"]
 end
 
 function World:update(dt, scroll)
+    self:get_processed_chunks(scroll)
     if self.lighting then
         self:propagate_lighting(scroll)
     end
     return self.processed_chunks
 end
 
+function World:get_processed_chunks(scroll)  -- side effect: updates self.processed_chunks
+    self.processed_chunks = {}
+
+    -- determine bounds
+    local min_x = math.floor(scroll.x / BS) - VIEW_PADDING
+    local max_x = math.floor((scroll.x + WIDTH) / BS) + VIEW_PADDING
+    local min_y = math.floor(scroll.y / BS) - VIEW_PADDING
+    local max_y = math.floor((scroll.y + HEIGHT) / BS) + VIEW_PADDING
+
+    -- save the topleft and bottomright chunks
+    local chunk_topleft = self:abs_pos_to_chunk(min_x, min_y)
+    local chunk_bottomright = self:abs_pos_to_chunk(max_x, max_y)
+
+    -- get the intermediate chunks
+    local safety = 1
+    for y = chunk_topleft.y - safety, chunk_bottomright.y + safety do
+        for x = chunk_topleft.x - safety, chunk_bottomright.x + safety do
+            table.insert(self.processed_chunks, commons.key(x, y))
+        end
+    end
+end
+
 function World:propagate_lighting(scroll)
     self.light_frame = self.light_frame + 1
-    if self.light_frame ~= 1 then
+    if self.light_frame ~= 10 then
+        _G.debug_info["light steps"] = 0
         return
     end
     self.light_frame = 0
@@ -490,10 +538,6 @@ function World:propagate_lighting(scroll)
     local max_x = math.floor((scroll.x + WIDTH) / BS) + VIEW_PADDING
     local min_y = math.floor(scroll.y / BS) - VIEW_PADDING
     local max_y = math.floor((scroll.y + HEIGHT) / BS) + VIEW_PADDING
-
-    -- empty processed chunks
-    self.processed_chunks = {}
-    local chunk_topleft, chunk_bottomright
 
     -- reset lightmap and light surface
     self.lightmap = {}
@@ -506,12 +550,20 @@ function World:propagate_lighting(scroll)
     local head, tail = 1, 0
 
     -- init air tiles
+    local grid_repr = {}
+    local grid_repr_bg = {}
     bench:start(Color.RED)
     for ty = min_y, max_y do
+        grid_repr[ty] = {}
+        grid_repr_bg[ty] = {}
+
         for tx = min_x, max_x do
             -- -- lighting stuff
             local name = blocks.name[self:abs_pos_to_tile(tx, ty)]
             local bg_name = blocks.name[self:abs_pos_to_bg_tile(tx, ty)]
+
+            grid_repr[ty][tx] = name
+            grid_repr_bg[ty][tx] = bg_name
 
             -- propagate light if the block is a light source
             if (name == "air" and bg_name == "air") or (name ~= "air" and bwand(name, BF.LIGHT_SOURCE)) then
@@ -521,25 +573,9 @@ function World:propagate_lighting(scroll)
             else
                 self.lightmap[ty][tx] = 0
             end
-
-            -- save the topleft and bottomright chunks
-            if tx == min_x and ty == min_y then
-                chunk_topleft = self:abs_pos_to_chunk(tx, ty)
-            elseif tx == max_x and ty == max_y then
-                chunk_bottomright = self:abs_pos_to_chunk(tx, ty)
-            end
-
         end
     end
     bench:finish(Color.RED)
-
-    -- -- from the topleft and topright chunks, get intermediate chunks
-    local safe = 1
-    for y = chunk_topleft.y - safe, chunk_bottomright.y + safe do
-        for x = chunk_topleft.x - safe, chunk_bottomright.x + safe do
-            table.insert(self.processed_chunks, commons.key(x, y))
-        end
-    end
 
     -- BFS
     local steps = 0
@@ -553,7 +589,10 @@ function World:propagate_lighting(scroll)
         for i = 1, #n do
             local nx, ny = n[i][1], n[i][2]
             if self.lightmap[ny] and self.lightmap[ny][nx] ~= nil then
-                local decay = 1
+                -- local name = grid_repr[ny][nx]
+                -- local decay = blocks.light_decay[name] or 1  -- in case I missed an entry
+                local decay = 0.8
+
                 local pass_lv = lv - decay
                 if pass_lv > (self.lightmap[ny][nx] or 0) and pass_lv > 0 then
                     steps = steps + 1
@@ -567,9 +606,6 @@ function World:propagate_lighting(scroll)
     bench:finish(Color.YELLOW)
 
     _G.debug_info["light steps"] = steps
-
-    -- return the processed chunks
-    return self.processed_chunks
 end
 
 function World:draw(scroll)
@@ -622,10 +658,6 @@ function World:draw(scroll)
 
             -- only overlay block with darkness if the block itself is not a light source
             if self.lighting then
-                -- get light value
-                local light = (self.lightmap[ty] and self.lightmap[ty][tx]) or 0
-
-                local norm_light = light / 15
                 if nbwand(name, BF.LIGHT_SOURCE) or (name == "air" and bg_name ~= "air") then
                         self.light_surf:setPixel(
                         tx - min_x, ty - min_y,
@@ -642,8 +674,6 @@ function World:draw(scroll)
             end
 
             love.graphics.setColor(Color.WHITE)
-
-            ::continue::
         end
     end
 
@@ -663,24 +693,29 @@ function World:draw(scroll)
     love.graphics.setColor(Color.WHITE)
     love.graphics.draw(self.batch)
 
-    -- update the player
-    self.player:draw(scroll)
-
     -- render the entities (render here so they work with the lightings)
-    local num_rendered_entities = systems.render:process(self.processed_chunks)
+    local num_rendered_entities = systems.render.process(self.processed_chunks)
 
     -- render chunk border rectangles (visual)
+    if true then
+        goto noborder
+    end
+
     for _, chunk_key in ipairs(self.processed_chunks) do
         love.graphics.setColor(Color.CYAN)
         local chunk_x, chunk_y = commons.parse_key(chunk_key)
         chunk_x = chunk_x * CW * BS
         chunk_y = chunk_y * CH * BS
         love.graphics.rectangle("line", chunk_x, chunk_y, CW * BS, CH * BS)
+        love.graphics.setFont(fonts.orbitron[20])
         love.graphics.print(chunk_key, chunk_x + CW * BS / 2, chunk_y + CH * BS / 2)
     end
 
+    ::noborder::
+
     if self.lighting then
         self.light_surf = love.graphics.newImage(self.light_surf)
+        -- self.light_surf:setFilter("nearest", "nearest")
         love.graphics.draw(self.light_surf, scroll.x + lighting_offset.x, scroll.y + lighting_offset.y, 0, BS, BS)
     end
 
@@ -693,7 +728,5 @@ function World:draw(scroll)
 end
 
 local world = World:new()
-
-systems.physics.world = world
 
 return world

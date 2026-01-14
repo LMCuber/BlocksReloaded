@@ -8,6 +8,7 @@ local Model = {}
 Model.__index = Model
 
 -- LLM CODE - NOT UNIT TESTED !!!
+-- ...not that you have tested non-LLM code dumbas
 local function centroid(points)
     local sumx, sumy, sumz = 0, 0, 0
     for _, p in ipairs(points) do

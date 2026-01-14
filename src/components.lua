@@ -1,31 +1,70 @@
 local Vec2 = require("src.libs.vec2")
 
--- C O M P O N E N T S
-local PlayerFollower = {}
-PlayerFollower.__index = PlayerFollower
-PlayerFollower._name = "PlayerFollower"
+local comp = {}
 
-function PlayerFollower:new()
-    local obj = setmetatable({}, PlayerFollower)
-    return obj
+-------------------------------------------------
+
+comp.Inventory = {}
+comp.Inventory.__index = comp.Inventory
+comp.Inventory._name = "Inventory"
+
+function comp.Inventory:new(items)
+    return setmetatable({
+        items = items,
+        index = 1
+    }, self)
 end
 
-local Transform = {}
-Transform.__index = Transform
-Transform._name = "Transform"
+-------------------------------------------------
 
-function Transform:new(pos, vel, gravity, sines, rot, rot_vel)
-    local obj = setmetatable({}, Transform)
+comp.Intent = {
+    NONE  = 0,
+    PLACE = 1,
+    BREAK = 2,
+}
+
+comp.Controllable = {}
+comp.Controllable.__index = comp.Controllable
+comp.Controllable._name = "Controllable"
+
+function comp.Controllable:new()
+    return setmetatable({
+        mouse_held = false,
+        intent = comp.Intent.NONE,
+    }, self)
+end
+
+-------------------------------------------------
+
+comp.CameraAnchor = {}
+comp.CameraAnchor.__index = comp.CameraAnchor
+comp.CameraAnchor._name = "CameraAnchor"
+
+function comp.CameraAnchor:new(speed)
+    return setmetatable({
+        speed = speed
+    }, self)
+end
+
+-------------------------------------------------
+
+comp.Transform = {}
+comp.Transform.__index = comp.Transform
+comp.Transform._name = "Transform"
+
+function comp.Transform:new(pos, vel, gravity, sines, rot, rot_vel)
+    local obj = setmetatable({}, self)
 
     obj.pos = pos
     obj.vel = vel
-    obj.gravity = gravity or _G.GRAVITY
+    obj.direc = 1
+    obj.gravity = (gravity or 1) * _G.GRAVITY
     obj.acc = Vec2:new(0, 0)
     obj.active = true
-    obj.sines = Vec2:new(0, 0)
+    obj.sines = sines or Vec2:new(0, 0)
     obj.rot = rot or 0
     obj.rot_vel = rot_vel or 0
-    
+
     obj.def_vel = vel:copy()
     obj.last_tile = nil
     obj.last_blocks_around = nil
@@ -36,63 +75,58 @@ function Transform:new(pos, vel, gravity, sines, rot, rot_vel)
             love.math.random() * 2 * math.pi
         )
     end
-    
+
     return obj
 end
 
-local Sprite = {}
-Sprite.__index = Sprite
-Sprite._name = "Sprite"
+-------------------------------------------------
 
-function Sprite:from_path(path)
-    local obj = setmetatable({}, Sprite)
+comp.Sprite = {}
+comp.Sprite.__index = comp.Sprite
+comp.Sprite._name = "Sprite"
+
+function comp.Sprite:from_path(path)
+    local obj = setmetatable({}, self)
 
     obj.path = path
-    
-    obj.anim_skin, obj.anim_mode = path:match(".*/(.-)/(.-)%.png$")  -- (portal, idle)
-
+    obj.anim_skin, obj.anim_mode = path:match(".*/(.-)/(.-)%.png$")
     obj.img = love.graphics.newImage(path)
     obj.anim = 1
-    return obj
-
-end
-
-local Hitbox = {}
-Hitbox.__index = Hitbox
-Hitbox._name = "Hitbox"
-
-function Hitbox:new(w, h)
-    local obj = setmetatable({}, Hitbox)
-
-    obj.w, obj.h = w, h
-    
-    return obj
-end
-
-function Hitbox:late()
-    local obj = setmetatable({}, Hitbox)
-
-    obj.late = true
 
     return obj
 end
 
-function Hitbox:aabb(x, y, other, ox, oy)
+-------------------------------------------------
+
+comp.Hitbox = {}
+comp.Hitbox.__index = comp.Hitbox
+comp.Hitbox._name = "Hitbox"
+
+function comp.Hitbox:new(w, h)
+    return setmetatable({
+        w = w,
+        h = h,
+        is_dynamic = false
+    }, self)
+end
+
+function comp.Hitbox:dynamic()
+    return setmetatable({
+        is_dynamic = true
+    }, self)
+end
+
+function comp.Hitbox:aabb(x, y, other, ox, oy)
     return x < ox + other.w and
-        x + self.w > ox and
-        y < oy + other.h and
-        y + self.h > oy
+           x + self.w > ox and
+           y < oy + other.h and
+           y + self.h > oy
 end
 
-function Hitbox:__tostring()
+function comp.Hitbox:__tostring()
     return string.format("Hitbox(%d, %d)", self.w, self.h)
 end
 
-local comp = {
-    Transform = Transform,
-    Sprite = Sprite,
-    Hitbox = Hitbox,
-    PlayerFollower = PlayerFollower,
-}
+-------------------------------------------------
 
 return comp

@@ -17,6 +17,7 @@ _G.BF = {
     LIGHT_SOURCE = 0,  -- air, torch, jack-o-lantern, etc.
     ORE          = 0,  -- coal, titanium, diamond, etc.
     ORNAMENT     = 0,  -- flowers, rocks, etc. Subset of "walkable".
+    UNBREAKABLE  = 0,  -- blackstone etc.
 }
 -- set the enum values from 0 to powers of 2 (they are initialized at 0 by defaylt)
 local exp = 0
@@ -29,19 +30,29 @@ end
 local flags = {
     air              = bit.bor(BF.EMPTY, BF.WALKABLE, BF.LIGHT_SOURCE),
     torch            = bit.bor(BF.LIGHT_SOURCE, BF.WALKABLE),
+    supertorch       = bit.bor(BF.LIGHT_SOURCE, BF.WALKABLE),
     ["base-ore"]     = BF.ORE,
     ["red-poppy"]    = BF.ORNAMENT,
     ["yellow-poppy"] = BF.ORNAMENT,
     orchid           = BF.ORNAMENT,
+    blackstone       = BF.UNBREAKABLE
 }
 
 -- subset flags that automatically need to be set beforehand
 for name, flag in pairs(flags) do
-    -- all ornaments are walkable by default
+    -- ornament ⊆ walkable
     if bit.band(flag, BF.ORNAMENT) ~= 0 then
         flags[name] = bit.bor(flag, BF.WALKABLE)
     end
 end
+
+-- lighting data
+_G.MAX_LIGHT = 15
+local light_decay = {
+    air = 1,
+    torch = 0.6,
+    supertorch = 1,
+}
 
 -- functions
 function _G.bwand(name, flag)
@@ -69,7 +80,7 @@ local block_list = {
     {"closed-door",     "wheat_st1",        "wheat_st2",       "wheat_st3",       "wheat_st4",       "stone-bricks",     "",            "arrow",       "wood_f_vrL",   "",            "wood_p_vrL",  ""},
     {"open-door",       "lotus",            "daivinus",        "dirt_f_depr",     "grass3",          "forge-table",      "bricks",      "solar-panel", "wood_f_vrN",   "",            "wood_p_vrN",  "wood_p"},
     {"cable_vrF",       "cable_vrH",        "karabiner",       "rope",            "blue_barrel",     "red_barrel",       "gun-crafter", "torch",       "grass_f",      "",            "",            "pillar_vr3"},
-    {"red-poppy",       "yellow-poppy",     "orchid",          "corn-crop_vr3.2", "corn-crop_vr4.2", "",                 "",            "",            "soil_f",       "soil_t",      "",            "pillar_vr2"},
+    {"red-poppy",       "yellow-poppy",     "orchid",          "corn-crop_vr3.2", "corn-crop_vr4.2", "",                 "",            "supertorch",  "soil_f",       "soil_t",      "",            "pillar_vr2"},
     {"",                "corn-crop_vr1.1",  "corn-crop_vr2.1", "corn-crop_vr3.1", "corn-crop_vr4.1", "cattail-top",      "pampas-top",  "",            "dirt_f",       "dirt_t",      "",            "pillar_vr1"},
     {"corn-crop_vr0.0", "corn-crop_vr1.0",  "corn-crop_vr2.0", "corn-crop_vr3.0", "corn-crop_vr4.0", "cattail",          "pampas",      "",            "",             "",            "",            "pillar_vr0"},
 }
@@ -79,6 +90,7 @@ local blocks = {
     quads = {},
     id = {},
     name = {},
+    light_decay = light_decay,
 }
 blocks.sprs:setFilter("nearest", "nearest")
 

@@ -25,7 +25,7 @@ for _, entity_type in ipairs(entity_types) do
             anim.data[skin][mode]["offset"] = yaml_data[skin][mode]["offset"]
 
             anim.data[skin][mode]["sprs"] = love.graphics.newImage(string.format(
-                "res/images/%s/%s/%s.png",  -- stupid fucking lua
+                "res/images/%s/%s/%s.png",
                 entity_type, skin, mode
             ))
             anim.data[skin][mode]["sprs"]:setFilter("nearest", "nearest")

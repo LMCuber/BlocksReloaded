@@ -4,6 +4,61 @@ local commons = {}
 _G.GRAVITY = 2600
 _G.WIDTH, _G.HEIGHT = love.graphics.getDimensions()
 
+function _G.test(...)
+    print(love.math.random(0, 999), ...)
+end
+
+function _G.iprint(tbl)
+    for _, elem in ipairs(tbl) do
+        print(elem)
+    end
+end
+
+-- LLM code
+function _G.pprint(value, indent, visited)
+    indent = indent or 0
+    visited = visited or {}
+
+    local spacing = string.rep("  ", indent)
+
+    if type(value) ~= "table" then
+        print(spacing .. tostring(value))
+        return
+    end
+
+    if visited[value] then
+        print(spacing .. "<circular reference>")
+        return
+    end
+
+    visited[value] = true
+    print(spacing .. "{")
+
+    for k, v in pairs(value) do
+        local key
+        if type(k) == "string" then
+            key = string.format("%q", k)
+        else
+            key = tostring(k)
+        end
+
+        io.write(spacing .. "  [" .. key .. "] = ")
+
+        if type(v) == "table" then
+            pprint(v, indent + 1, visited)
+        else
+            print(tostring(v))
+        end
+    end
+
+    print(spacing .. "}")
+end
+
+function _G.bar()
+    print("--------------------------------------------------------------------------------------")
+end
+
+-- useful functions
 function commons.key(cx, cy)
     return cx .. "," .. cy
 end
@@ -13,35 +68,18 @@ function commons.parse_key(key)
     return tonumber(cx), tonumber(cy)
 end
 
-function _G.test(...)
-    print(love.math.random(0, 999), ...)
-end
-
-function _G.pprint(tbl, indent)
-    indent = indent or 0
-    local formatting = string.rep("  ", indent)
-
-    if type(tbl) ~= "table" then
-        print(formatting .. tostring(tbl))
-        return
-    end
-
-    print(formatting .. "{")
-    for k, v in pairs(tbl) do
-        local key = tostring(k)
-        if type(v) == "table" then
-            io.write(formatting .. "  " .. key .. " = ")
-            pprint(v, indent + 1)
-        else
-            print(formatting .. "  " .. key .. " = " .. tostring(v))
-        end
-    end
-    print(formatting .. "}")
-end
-
--- useful functions
 function commons.round_to(x, step)
     return math.floor(x / step + 0.5) * step
+end
+
+function commons.cartesian(a, b)
+    local result = {}
+    for i = 1, #a do
+        for j = 1, #b do
+            table.insert(result, {a[i], b[j]})
+        end
+    end
+    return result
 end
 
 function commons.intersect_n(...)
@@ -125,6 +163,16 @@ function commons.startswith(str, prefix)
     return str:sub(1, #prefix) == prefix
 end
 
+function commons.filter(tbl, predicate)
+    local result = {}
+    for i, v in ipairs(tbl) do
+        if predicate(v) then
+            table.insert(result, v)
+        end
+    end
+    return result
+end
+
 function commons.map(tbl, func)
     local result = {}
     for i, v in ipairs(tbl) do
@@ -147,6 +195,15 @@ function commons.length(v)
         sum = sum + v[i] * v[i]
     end
     return math.sqrt(sum)
+end
+
+-- LLM
+function commons.collidepointmouse(rx, ry, rw, rh)
+    local px, py = love.mouse.getPosition()
+    return px >= rx and
+           px <= rx + rw and
+           py >= ry and
+           py <= ry + rh
 end
 
 return commons
