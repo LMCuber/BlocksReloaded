@@ -9,7 +9,6 @@ local Color = require("src.color")
 local fonts = require("src.fonts")
 local blocks = require("src.blocks")
 
--- S Y S T E M S
 local Button = {
     LEFT = 1,
     RIGHT = 2,
@@ -19,13 +18,13 @@ local Button = {
 }
 
 local function default_key_data()
+    -- turn all buttons off at start of game (nothing is pressed yet)
     return {down = false, was_down = false, clicked = false}
 end
 
 local systems = {
-    _misc = {
+    _misc_update = {
         relocate = {},
-        physics = {},
     },
 
     _singletons = {
@@ -46,7 +45,9 @@ local systems = {
     render = {},
     camera = {},
     controllable = {},
+    editing = {},
     late_rects = {},
+    physics = {},
 }
 -- shorthand
 local sg = systems._singletons
@@ -58,14 +59,23 @@ for i = 1, #alphabet do
     sg.keys[char] = default_key_data()
 end
 
+-------------------------------------------------
 
-function systems:process_misc_systems(chunks)
-    for _, system in pairs(systems._misc) do
-        system:process(chunks)
+function systems.process_misc_update_systems(chunks)
+    for _, system in pairs(systems._misc_update) do
+        system.process(chunks)
     end
 end
 
-function systems.render:process(chunks)
+function systems.process_misc_render_systems(chunks)
+    for _, system in pairs(systems._misc_render) do
+        system.process(chunks)
+    end
+end
+
+-------------------------------------------------
+
+function systems.render.process(chunks)
     local num_rendered = 0
 
     for _, entry in ipairs(ecs:get_components(chunks, comp.Transform, comp.Sprite)) do
@@ -109,23 +119,23 @@ function systems.render:process(chunks)
                 (tr.direc == -1 and -1 or 1) * S,
                 S
             )
-           
+
             -- chunk
             love.graphics.setFont(fonts.orbitron[12])
             love.graphics.setColor(Color.CYAN)
             love.graphics.print(chunk, tr.pos.x, tr.pos.y - 60)
 
             -- image border (image render location)
-            love.graphics.setColor(Color.ORANGE)
-            love.graphics.rectangle("line", draw_x, draw_y, img_w, img_h)
-            love.graphics.setFont(fonts.orbitron[12])
-            love.graphics.print(img_w .. "x" .. img_h, tr.pos.x, tr.pos.y - 40)
+            -- love.graphics.setColor(Color.ORANGE)
+            -- love.graphics.rectangle("line", draw_x, draw_y, img_w, img_h)
+            -- love.graphics.setFont(fonts.orbitron[12])
+            -- love.graphics.print(img_w .. "x" .. img_h, tr.pos.x, tr.pos.y - 40)
 
             -- hitbox
-            love.graphics.setColor(Color.LIME)
-            love.graphics.rectangle("line", tr.pos.x, tr.pos.y, hitbox.w, hitbox.h)
-            love.graphics.setFont(fonts.orbitron[12])
-            love.graphics.print(hitbox.w .. "x" .. hitbox.h, tr.pos.x, tr.pos.y - 20)
+            -- love.graphics.setColor(Color.LIME)
+            -- love.graphics.rectangle("line", tr.pos.x, tr.pos.y, hitbox.w, hitbox.h)
+            -- love.graphics.setFont(fonts.orbitron[12])
+            -- love.graphics.print(hitbox.w .. "x" .. hitbox.h, tr.pos.x, tr.pos.y - 20)
         end
 
         num_rendered = num_rendered + 1
@@ -136,7 +146,7 @@ function systems.render:process(chunks)
     return num_rendered
 end
 
-function systems._misc.physics:process(chunks)
+function systems.physics.process(chunks, world)
     local debug_rects = {}
 
     for _, entry in ipairs(ecs:get_components(chunks, comp.Transform, comp.Sprite, comp.Hitbox)) do
@@ -158,7 +168,7 @@ function systems._misc.physics:process(chunks)
 
         table.insert(debug_rects, {tr.pos.x, tr.pos.y, hitbox.w, hitbox.h})
 
-        for _, block_pos in ipairs(self.world:get_blocks_around_pos(
+        for _, block_pos in ipairs(world:get_blocks_around_pos(
             tr.pos.x + hitbox.w / 2,
             tr.pos.y + hitbox.h / 2
         )) do
@@ -182,7 +192,7 @@ function systems._misc.physics:process(chunks)
 
         table.insert(debug_rects, {tr.pos.x, tr.pos.y, hitbox.w, hitbox.h})
 
-        for _, block_pos in ipairs(self.world:get_blocks_around_pos(
+        for _, block_pos in ipairs(world:get_blocks_around_pos(
             tr.pos.x + hitbox.w / 2,
             tr.pos.y + hitbox.h / 2
         )) do
@@ -204,7 +214,7 @@ function systems._misc.physics:process(chunks)
     return debug_rects
 end
 
-function systems.camera:process(chunks)
+function systems.camera.process(chunks)
     for _, entry in ipairs(ecs:get_components(chunks, comp.CameraAnchor, comp.Transform)) do
         local _, _, cam, tr = commons.unpack(entry)
 
@@ -217,12 +227,12 @@ function systems.camera:process(chunks)
     end
 end
 
-function systems.controllable:process(chunks, world)
+function systems.controllable.process(chunks, world)
     local Intent = comp.Intent
 
     for _, entry in ipairs(ecs:get_components(chunks, comp.Controllable, comp.Sprite, comp.Transform)) do
         -- controlling movement with keyboard
-        local _, _, ctrl, sprite, tr = commons.unpack(entry)
+        local ent_id, _, ctrl, sprite, tr = commons.unpack(entry)
 
         if sg.keys["a"].down or sg.keys["d"].down then
             sprite.anim_mode = "run"
@@ -240,19 +250,30 @@ function systems.controllable:process(chunks, world)
         end
 
         if sg.keys["w"].clicked then
-            tr.vel.y = -810
+            tr.vel.y = -740
         end
+    end
+end
 
+function systems.editing.process(chunks, world)
+    local Intent = comp.Intent
+
+    -- controllable + inventory means editing (might change later idk)
+    for _, entry in ipairs(ecs:get_components(chunks, comp.Inventory, comp.Controllable)) do
+        local ent_id, _, inv, ctrl = commons.unpack(entry)
+
+        -- get the mouse position and current hovering block
         local mx, my = sg.mouse.x, sg.mouse.y
         local key, block_x, block_y = world:mouse_to_timbre(mx, my, sg.scroll)
         local current = blocks.name[world:get(key, block_x, block_y)]
 
-        -- visual block hover rectangle
+        -- visual block hover rectanglem
         local chunk_x, chunk_y = commons.parse_key(key)
         local rect_x = (chunk_x * CW + block_x - 1) * BS  -- bc 1-based indexing
         local rect_y = (chunk_y * CH + block_y - 1) * BS
         table.insert(sg.late_rects, {rect_x, rect_y, BS, BS, Color.ORANGE})
 
+        -- check which action is triggered by clicking mouse
         if sg.buttons[Button.LEFT].clicked then
             if current == nil or bwand(current, BF.EMPTY) then
                 ctrl.intent = Intent.PLACE
@@ -264,7 +285,7 @@ function systems.controllable:process(chunks, world)
         if (sg.buttons[Button.LEFT].down) then
             if ctrl.intent == Intent.PLACE then
                 if current == nil or bwand(current, BF.EMPTY) then
-                    world:place(key, block_x, block_y, "torch")
+                    world:place(key, block_x, block_y, inv.items[inv.index])
                 end
             elseif ctrl.intent == Intent.BREAK then
                 world:break_(key, block_x, block_y)
@@ -273,7 +294,7 @@ function systems.controllable:process(chunks, world)
     end
 end
 
-function systems.singletons:process()
+function systems.singletons.process()
     -- mouse position
     local _x, _y = love.mouse.getPosition()
     sg.mouse = {x = _x, y = _y}
@@ -295,7 +316,7 @@ function systems.singletons:process()
     end
 end
 
-function systems.late_rects:process()
+function systems.late_rects.process()
     -- draw all the late rects to the screen
     for _, rect in ipairs(sg.late_rects) do
         love.graphics.setColor(rect[5])
@@ -307,7 +328,7 @@ end
 
 -- M I S C E L L A N E O U S  S Y S T E M S -------------------------------------------------------
 
-function systems._misc.relocate:process(chunks)
+function systems._misc_update.relocate.process(chunks)
     for _, entry in ipairs(ecs:get_components(chunks, comp.Transform)) do
         local ent_id, chunk, tr = commons.unpack(entry)
 

@@ -327,7 +327,7 @@ function World:modify_chunk(key)
                 end
 
                 -- pyramid
-                if chance(1 / 40) then
+                if chance(1 / 120) then
                     local pyr_height = love.math.random(6, 20)
                     local pyr_offset = love.math.random(1, pyr_height / 4)
                     for yo = 0, pyr_height do
@@ -349,15 +349,13 @@ function World:modify_chunk(key)
                 end
 
                 -- entities
-                if chance(1 / 1) and key == "2,1" then
-                    print("CREAAAAATION!!")
+                if chance(1 / 100) then
                     for i = 1, 1 do
                         ecs:create_entity(
                             key,
                             comp.Transform:new(
                                 Vec2:new(abs_x * BS, (abs_y - 7 - i) * BS),
-                                Vec2:new(0, 0),
-                                0
+                                Vec2:new(0, 0)
                             ),
                             comp.Sprite:from_path("res/images/statics/portal/idle.png"),
                             comp.Hitbox:dynamic()
@@ -365,18 +363,30 @@ function World:modify_chunk(key)
                     end
                 end
 
-                -- if chance(1 / 10) then
-                --     ecs:create_entity(
-                --         key,
-                --         comp.Transform:new(
-                --             Vec2:new(abs_x * BS, (abs_y - 3) * BS),
-                --             Vec2:new(0, 0),
-                --             0
-                --         ),
-                --         comp.Sprite:from_path("res/images/mobs/bee/walk.png"),
-                --         comp.Hitbox:dynamic()
-                --     )
-                -- end
+                if chance(1 / 120) then
+                    ecs:create_entity(
+                        key,
+                        comp.Transform:new(
+                            Vec2:new(abs_x * BS, (abs_y - 7) * BS),
+                            Vec2:new(200, 0)
+                        ),
+                        comp.Sprite:from_path("res/images/mobs/chicken/walk.png"),
+                        comp.Hitbox:dynamic()
+                    )
+                end
+
+                if chance(1 / 10) then
+                    ecs:create_entity(
+                        key,
+                        comp.Transform:new(
+                            Vec2:new(abs_x * BS, (abs_y - 3) * BS),
+                            Vec2:new(0, 0),
+                            0
+                        ),
+                        comp.Sprite:from_path("res/images/mobs/bee/walk.png"),
+                        comp.Hitbox:dynamic()
+                    )
+                end
 
                 if chance(1 / 10) then
                     -- self:set(key, x, y - 3, "dynamite")
@@ -684,9 +694,13 @@ function World:draw(scroll)
     love.graphics.draw(self.batch)
 
     -- render the entities (render here so they work with the lightings)
-    local num_rendered_entities = systems.render:process(self.processed_chunks)
+    local num_rendered_entities = systems.render.process(self.processed_chunks)
 
     -- render chunk border rectangles (visual)
+    if true then
+        goto noborder
+    end
+
     for _, chunk_key in ipairs(self.processed_chunks) do
         love.graphics.setColor(Color.CYAN)
         local chunk_x, chunk_y = commons.parse_key(chunk_key)
@@ -697,9 +711,11 @@ function World:draw(scroll)
         love.graphics.print(chunk_key, chunk_x + CW * BS / 2, chunk_y + CH * BS / 2)
     end
 
+    ::noborder::
+
     if self.lighting then
         self.light_surf = love.graphics.newImage(self.light_surf)
-        self.light_surf:setFilter("nearest", "nearest")
+        -- self.light_surf:setFilter("nearest", "nearest")
         love.graphics.draw(self.light_surf, scroll.x + lighting_offset.x, scroll.y + lighting_offset.y, 0, BS, BS)
     end
 
@@ -712,6 +728,5 @@ function World:draw(scroll)
 end
 
 local world = World:new()
-systems._misc.physics.world = world
 
 return world

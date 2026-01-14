@@ -1,5 +1,4 @@
 ---@diagnostic disable: duplicate-set-field, lowercase-global
-local Player = require("src.player")
 local Color = require("src.color")
 local Vec2 = require("src.libs.vec2")
 local Benchmarker = require("src.libs.benchmarker")
@@ -7,6 +6,7 @@ local ecs = require("src.libs.ecs")
 local comp = require("src.components")
 local Model = require("src.3d_model")
 local neat = require("src.libs.neat")
+local imgui = require("src.libs.imgui")
 -- 
 local world = require("src.world")
 local fonts = require("src.fonts")
@@ -28,8 +28,9 @@ ecs:create_entity(
     ),
     comp.Sprite:from_path("res/images/player_animations/samurai/idle.png"),
     comp.Hitbox:new(52, 80),
-    comp.CameraAnchor:new(0.05),  -- camera follows its position
-    comp.Controllable:new()       -- can move using keyboard
+    comp.CameraAnchor:new(0.04),  -- camera follows its position
+    comp.Controllable:new(),      -- can move using keyboard,
+    comp.Inventory:new({"supertorch", "torch", "supertorch"})         -- inventory to place blocks
 )
 
 local processed_chunks = {}
@@ -53,10 +54,12 @@ function love.keypressed(key)
     if key == "escape" then
         love.event.quit()
     end
-    world:process_keypress(key)
+    world.process_keypress(key)
 end
 
 function love.load()
+    local icon = love.image.newImageData("res/images/visuals/windows_icon.png")
+    love.window.setIcon(icon)
     love.graphics.setBackgroundColor(1, 1, 1, 0)
 end
 
@@ -68,13 +71,15 @@ function love.update(dt)
 
     processed_chunks = world:update(dt, systems._singletons.scroll)
 
-    -- model.light[1] = math.cos(6*love.timer.getTime())
-    -- model.light[2] = math.sin(6*love.timer.getTime())
-    -- model:update()
-
     bench:start(Color.CYAN)
 
-    systems:process_misc_systems(processed_chunks)
+    -- singletons first
+    systems.singletons.process()
+
+    -- other systems that don't just take (processed_chunks)
+    systems.physics.process(processed_chunks, world)
+    systems.editing.process(processed_chunks, world)
+    systems.process_misc_update_systems(processed_chunks)
 
     bench:finish(Color.CYAN)
 end
@@ -96,18 +101,14 @@ function love.draw()
     -- from now on, all rendered entities are rendered with camera scroll
     love.graphics.push()
 
-    -- process all singleton entities (must be updated before the rest of the systems)
-    systems.singletons:process()
-    systems.camera:process(processed_chunks)
+    systems.controllable.process(processed_chunks, world)
+    systems.camera.process(processed_chunks)
 
-    -- render world AFTER camera
+    -- render world AFTER camera at least
     world:draw(systems._singletons.scroll)
 
-    -- controllable system (accessing world block data)
-    systems.controllable:process(processed_chunks, world)
-
     -- debugging rects
-    systems.late_rects:process()
+    systems.late_rects.process()
 
     -- debug hitboxes
     for _, rect in ipairs(debug_rects) do
@@ -119,7 +120,14 @@ function love.draw()
 
     -- FPS, debug, etc.
     bench:draw()
-    -- model:draw()
+
+    -- imgui
+    imgui.begin("Settings", 10, 150, 140, 140)
+
+    local _ = imgui.checkbox("Hitboxes")
+    local _ = imgui.checkbox("Borders")
+
+    imgui.end_()
 
     love.graphics.setColor(Color.ORANGE)
     love.graphics.setFont(fonts.orbitron[24])

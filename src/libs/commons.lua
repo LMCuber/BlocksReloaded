@@ -197,4 +197,13 @@ function commons.length(v)
     return math.sqrt(sum)
 end
 
+-- LLM
+function commons.collidepointmouse(rx, ry, rw, rh)
+    local px, py = love.mouse.getPosition()
+    return px >= rx and
+           px <= rx + rw and
+           py >= ry and
+           py <= ry + rh
+end
+
 return commons
