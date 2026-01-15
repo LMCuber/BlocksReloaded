@@ -1,4 +1,4 @@
----@diagnostic disable: duplicate-set-field, lowercase-global
+---@diagnostic disable: duplicate-set-field
 local Color = require("src.color")
 local Vec2 = require("src.libs.vec2")
 local Benchmarker = require("src.libs.benchmarker")
@@ -7,7 +7,7 @@ local comp = require("src.components")
 local Model = require("src.3d_model")
 local neat = require("src.libs.neat")
 local imgui = require("src.libs.imgui")
--- 
+local shaders = require("src.shaders")
 local world = require("src.world")
 local fonts = require("src.fonts")
 local systems = require("src.systems")
@@ -58,6 +58,7 @@ function love.keypressed(key)
 end
 
 function love.load()
+    _G.CANVAS = love.graphics.newCanvas(love.graphics.getWidth(), love.graphics.getHeight())
     local icon = love.image.newImageData("res/images/visuals/windows_icon.png")
     love.window.setIcon(icon)
     love.graphics.setBackgroundColor(1, 1, 1, 0)
@@ -82,6 +83,18 @@ function love.update(dt)
     systems.process_misc_update_systems(processed_chunks)
 
     bench:finish(Color.CYAN)
+
+    -- shaders
+    -- shaders.default:send("lightDir", {0, 1, 0})
+    shaders.default:send("time", love.timer.getTime() * 0.1)
+    -- shaders.default:send("intensity", 1)
+    -- shaders.default:send("pixelSize", (math.sin(love.timer.getTime() * 4) + 1) * 0.5 * 16)
+    -- shaders.default:send("offset", 2)
+    -- shaders.default:send("threshold", 0.4)
+    -- shaders.default:send("time", love.timer.getTime());
+    -- shaders.default:send("resolution", {love.graphics.getWidth(), love.graphics.getHeight()});
+    -- shaders.default:send("k", 0.05);
+    shaders.default:send("levels", 16);
 end
 
 ---------------------------------------------------------------------
@@ -95,6 +108,11 @@ local function show_debug_info()
 end
 
 function love.draw()
+    love.graphics.setCanvas(CANVAS)
+
+    -- reset the shader of the last frame
+
+    -- background color
     love.graphics.setColor({0.14, 0.12, 0.24})
     love.graphics.rectangle("fill", 0, 0, WIDTH, HEIGHT)
 
@@ -137,5 +155,10 @@ function love.draw()
 
     show_debug_info()
 
+    -- finish up
     love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.setCanvas()
+    love.graphics.setShader(shaders.default)
+    love.graphics.draw(CANVAS, 0, 0)
+    love.graphics.setShader()
 end

@@ -9,6 +9,7 @@ local systems = require("src.systems")
 local fonts = require("src.fonts")
 local commons = require("src.libs.commons")
 local yaml = require("src.libs.yaml")
+local shaders = require("src.shaders")
 
 -- constants
 local VIEW_PADDING = MAX_LIGHT
@@ -349,7 +350,7 @@ function World:modify_chunk(key)
                 end
 
                 -- entities
-                if chance(1 / 100) then
+                if chance(1 / 10) then
                     for i = 1, 1 do
                         ecs:create_entity(
                             key,
