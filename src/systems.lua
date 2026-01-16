@@ -8,6 +8,8 @@ local anim = require("src.animation")
 local Color = require("src.color")
 local fonts = require("src.fonts")
 local blocks = require("src.blocks")
+local imgui = require("src.libs.imgui")
+local config = require("src.config")
 
 local Button = {
     LEFT = 1,
@@ -23,10 +25,7 @@ local function default_key_data()
 end
 
 local systems = {
-    _misc_update = {
-        relocate = {},
-    },
-
+    -- singleton object
     _singletons = {
         fake_scroll = Vec2:new(0, 0),
         scroll = Vec2:new(0, 0),
@@ -38,16 +37,34 @@ local systems = {
             [Button.MOUSE_4] = default_key_data(),
             [Button.MOUSE_5] = default_key_data(),
         },
+        raw_buttons = {
+            [Button.LEFT]    = default_key_data(),
+            [Button.RIGHT]   = default_key_data(),
+            [Button.MIDDLE]  = default_key_data(),
+            [Button.MOUSE_4] = default_key_data(),
+            [Button.MOUSE_5] = default_key_data(),
+        },
         keys = {},
         late_rects = {},
+        dead_zone = {0, 0, love.graphics.getWidth(), love.graphics.getHeight()}
+    },
+
+    -- update step systems
+    _misc_update = {
+        relocate = {},
     },
     singletons = {},
+    physics = {},
+    editing = {},
+
+    -- draw step systems
+    _misc_draw = {
+    },
     render = {},
+    imgui = {},
     camera = {},
     controllable = {},
-    editing = {},
     late_rects = {},
-    physics = {},
 }
 -- shorthand
 local sg = systems._singletons
@@ -67,13 +84,25 @@ function systems.process_misc_update_systems(chunks)
     end
 end
 
-function systems.process_misc_render_systems(chunks)
-    for _, system in pairs(systems._misc_render) do
+function systems.process_misc_draw_systems(chunks)
+    for _, system in pairs(systems._misc_draw) do
         system.process(chunks)
     end
 end
 
 -------------------------------------------------
+---
+function systems.imgui.process(imgui_area)
+    systems._singletons.dead_zone = imgui_area
+
+    -- imgui
+    imgui.begin("Settings", commons.unpack(imgui_area))
+
+    imgui.checkbox("Hitboxes", config, "hitboxes")
+    imgui.checkbox("Borders", config, "borders")
+
+    imgui.end_()
+end
 
 function systems.render.process(chunks)
     local num_rendered = 0
@@ -120,22 +149,24 @@ function systems.render.process(chunks)
                 S
             )
 
-            -- chunk
-            love.graphics.setFont(fonts.orbitron[12])
-            love.graphics.setColor(Color.CYAN)
-            love.graphics.print(chunk, tr.pos.x, tr.pos.y - 60)
+            if config.hitboxes then
+                -- chunk
+                love.graphics.setFont(fonts.orbitron[12])
+                love.graphics.setColor(Color.CYAN)
+                love.graphics.print(chunk, tr.pos.x, tr.pos.y - 60)
 
-            -- image border (image render location)
-            -- love.graphics.setColor(Color.ORANGE)
-            -- love.graphics.rectangle("line", draw_x, draw_y, img_w, img_h)
-            -- love.graphics.setFont(fonts.orbitron[12])
-            -- love.graphics.print(img_w .. "x" .. img_h, tr.pos.x, tr.pos.y - 40)
+                -- image render location rectangle
+                love.graphics.setColor(Color.ORANGE)
+                love.graphics.rectangle("line", draw_x, draw_y, img_w, img_h)
+                love.graphics.setFont(fonts.orbitron[12])
+                love.graphics.print(img_w .. "x" .. img_h, tr.pos.x, tr.pos.y - 40)
 
-            -- hitbox
-            -- love.graphics.setColor(Color.LIME)
-            -- love.graphics.rectangle("line", tr.pos.x, tr.pos.y, hitbox.w, hitbox.h)
-            -- love.graphics.setFont(fonts.orbitron[12])
-            -- love.graphics.print(hitbox.w .. "x" .. hitbox.h, tr.pos.x, tr.pos.y - 20)
+                -- hitbox
+                love.graphics.setColor(Color.LIME)
+                love.graphics.rectangle("line", tr.pos.x, tr.pos.y, hitbox.w, hitbox.h)
+                love.graphics.setFont(fonts.orbitron[12])
+                love.graphics.print(hitbox.w .. "x" .. hitbox.h, tr.pos.x, tr.pos.y - 20)
+            end
         end
 
         num_rendered = num_rendered + 1
@@ -232,7 +263,7 @@ function systems.controllable.process(chunks, world)
 
     for _, entry in ipairs(ecs:get_components(chunks, comp.Controllable, comp.Sprite, comp.Transform)) do
         -- controlling movement with keyboard
-        local ent_id, _, ctrl, sprite, tr = commons.unpack(entry)
+        local _, _, _, sprite, tr = commons.unpack(entry)
 
         if sg.keys["a"].down or sg.keys["d"].down then
             sprite.anim_mode = "run"
@@ -260,7 +291,7 @@ function systems.editing.process(chunks, world)
 
     -- controllable + inventory means editing (might change later idk)
     for _, entry in ipairs(ecs:get_components(chunks, comp.Inventory, comp.Controllable)) do
-        local ent_id, _, inv, ctrl = commons.unpack(entry)
+        local _, _, inv, ctrl = commons.unpack(entry)
 
         -- get the mouse position and current hovering block
         local mx, my = sg.mouse.x, sg.mouse.y
@@ -295,21 +326,31 @@ function systems.editing.process(chunks, world)
 end
 
 function systems.singletons.process()
-    -- mouse position
+    -- get mouse position
     local _x, _y = love.mouse.getPosition()
     sg.mouse = {x = _x, y = _y}
 
-    -- all keys
-    for key, state in pairs(sg.keys) do
-        local is_down = love.keyboard.isDown(key)
+    -- all deadzone-limited buttons
+    if not commons.collidepointmouse(commons.unpack(systems._singletons.dead_zone)) then
+        for button_id, state in pairs(sg.buttons) do
+            local is_down = love.mouse.isDown(button_id)  -- e.g. 1 or 3
+            state.clicked = is_down and not state.down
+            state.was_down = state.down
+            state.down = is_down
+        end
+    end
+
+    -- all buttons bypassing the dead zone (raw buttons)
+    for button_id, state in pairs(sg.raw_buttons) do
+        local is_down = love.mouse.isDown(button_id)  -- e.g. 1 or 3
         state.clicked = is_down and not state.down
         state.was_down = state.down
         state.down = is_down
     end
 
-    -- all button presses AND holds
-    for button_id, state in pairs(sg.buttons) do
-        local is_down = love.mouse.isDown(button_id)  -- e.g. 1 or 3
+    -- all keyboard unput
+    for key, state in pairs(sg.keys) do
+        local is_down = love.keyboard.isDown(key)
         state.clicked = is_down and not state.down
         state.was_down = state.down
         state.down = is_down

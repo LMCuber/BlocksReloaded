@@ -1,5 +1,15 @@
-vec4 effect(vec4 color, Image texture, vec2 texture_coords, vec2 screen_coords) {
-    vec4 og = Texel(texture, texture_coords);
+extern float time;
+extern int levels;
 
-    return og * color;
+vec4 effect(vec4 color, Image tex, vec2 uv, vec2 px) {
+    time; levels;
+
+    vec4 c = Texel(tex, uv);
+
+    // Add a small sine offset per channel to animate colors
+    c.r = floor(fract(c.r + sin(time * 0*1.0)) * float(levels)) / float(levels);
+    c.g = floor(fract(c.g + sin(time * 0*1.5)) * float(levels)) / float(levels);
+    c.b = floor(fract(c.b + sin(time * 0*2.0)) * float(levels)) / float(levels);
+
+    return c * color;
 }

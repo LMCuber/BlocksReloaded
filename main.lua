@@ -1,4 +1,4 @@
----@diagnostic disable: duplicate-set-field, lowercase-global
+---@diagnostic disable: duplicate-set-field
 local Color = require("src.color")
 local Vec2 = require("src.libs.vec2")
 local Benchmarker = require("src.libs.benchmarker")
@@ -7,10 +7,11 @@ local comp = require("src.components")
 local Model = require("src.3d_model")
 local neat = require("src.libs.neat")
 local imgui = require("src.libs.imgui")
--- 
+local shaders = require("src.shaders")
 local world = require("src.world")
 local fonts = require("src.fonts")
 local systems = require("src.systems")
+local commons = require("src.libs.commons")
 
 ---------------------------------------------------------------------
 
@@ -27,15 +28,14 @@ ecs:create_entity(
         1
     ),
     comp.Sprite:from_path("res/images/player_animations/samurai/idle.png"),
-    comp.Hitbox:new(52, 80),
+    comp.Hitbox:new(52, 80),  -- static hitbox
     comp.CameraAnchor:new(0.04),  -- camera follows its position
-    comp.Controllable:new(),      -- can move using keyboard,
-    comp.Inventory:new({"supertorch", "torch", "supertorch"})         -- inventory to place blocks
+    comp.Controllable:new(),  -- can move using keyboard,
+    comp.Inventory:new({"torch", "torch", "supertorch"})  -- inventory to place blocks
 )
 
 local processed_chunks = {}
 local debug_rects = {}
-
 
 -- -- mandatory arguments
 -- obj.obj_path = kwargs.obj_path
@@ -58,6 +58,7 @@ function love.keypressed(key)
 end
 
 function love.load()
+    _G.CANVAS = love.graphics.newCanvas(love.graphics.getWidth(), love.graphics.getHeight())
     local icon = love.image.newImageData("res/images/visuals/windows_icon.png")
     love.window.setIcon(icon)
     love.graphics.setBackgroundColor(1, 1, 1, 0)
@@ -79,9 +80,22 @@ function love.update(dt)
     -- other systems that don't just take (processed_chunks)
     systems.physics.process(processed_chunks, world)
     systems.editing.process(processed_chunks, world)
+    systems.controllable.process(processed_chunks, world)
     systems.process_misc_update_systems(processed_chunks)
 
     bench:finish(Color.CYAN)
+
+    -- shaders
+    -- shaders.default:send("lightDir", {0, 1, 0})
+    shaders.default:send("time", love.timer.getTime() *0.1)
+    -- shaders.default:send("intensity", 1)
+    -- shaders.default:send("pixelSize", (math.sin(love.timer.getTime() * 4) + 1) * 0.5 * 16)
+    -- shaders.default:send("offset", 2)
+    -- shaders.default:send("threshold", 0.4)
+    -- shaders.default:send("time", love.timer.getTime());
+    -- shaders.default:send("resolution", {love.graphics.getWidth(), love.graphics.getHeight()});
+    -- shaders.default:send("k", 0.05);
+    shaders.default:send("levels", 16);
 end
 
 ---------------------------------------------------------------------
@@ -95,20 +109,24 @@ local function show_debug_info()
 end
 
 function love.draw()
+    love.graphics.setCanvas(CANVAS)
+
+    -- reset the shader of the last frame
+    love.graphics.setShader()
+
+    -- background color
     love.graphics.setColor({0.14, 0.12, 0.24})
     love.graphics.rectangle("fill", 0, 0, WIDTH, HEIGHT)
 
     -- from now on, all rendered entities are rendered with camera scroll
     love.graphics.push()
 
-    systems.controllable.process(processed_chunks, world)
     systems.camera.process(processed_chunks)
 
-    -- render world AFTER camera at least
     world:draw(systems._singletons.scroll)
 
-    -- debugging rects
     systems.late_rects.process()
+    systems.process_misc_draw_systems(processed_chunks)
 
     -- debug hitboxes
     for _, rect in ipairs(debug_rects) do
@@ -121,15 +139,8 @@ function love.draw()
     -- FPS, debug, etc.
     bench:draw()
 
-    -- imgui
-    imgui.begin("Settings", 10, 150, 140, 140)
+    systems.imgui.process({10, 150, 140, 140})
 
-    local _ = imgui.checkbox("Hitboxes")
-    local _ = imgui.checkbox("Borders")
-
-    imgui.end_()
-
-    love.graphics.setColor(Color.ORANGE)
     love.graphics.setFont(fonts.orbitron[24])
     love.graphics.print("FPS: " .. love.timer.getFPS(), 6, 6)
 
@@ -137,5 +148,10 @@ function love.draw()
 
     show_debug_info()
 
+    -- finish up
     love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.setCanvas()
+    -- love.graphics.setShader(shaders.default)
+    love.graphics.draw(CANVAS, 0, 0)
+    love.graphics.setShader()
 end

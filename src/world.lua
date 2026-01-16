@@ -9,6 +9,8 @@ local systems = require("src.systems")
 local fonts = require("src.fonts")
 local commons = require("src.libs.commons")
 local yaml = require("src.libs.yaml")
+local shaders = require("src.shaders")
+local config = require("src.config")
 
 -- constants
 local VIEW_PADDING = MAX_LIGHT
@@ -349,7 +351,7 @@ function World:modify_chunk(key)
                 end
 
                 -- entities
-                if chance(1 / 100) then
+                if chance(1 / 10) then
                     for i = 1, 1 do
                         ecs:create_entity(
                             key,
@@ -697,21 +699,17 @@ function World:draw(scroll)
     local num_rendered_entities = systems.render.process(self.processed_chunks)
 
     -- render chunk border rectangles (visual)
-    if true then
-        goto noborder
+    if config.borders then
+        for _, chunk_key in ipairs(self.processed_chunks) do
+            love.graphics.setColor(Color.CYAN)
+            local chunk_x, chunk_y = commons.parse_key(chunk_key)
+            chunk_x = chunk_x * CW * BS
+            chunk_y = chunk_y * CH * BS
+            love.graphics.rectangle("line", chunk_x, chunk_y, CW * BS, CH * BS)
+            love.graphics.setFont(fonts.orbitron[20])
+            love.graphics.print(chunk_key, chunk_x + CW * BS / 2, chunk_y + CH * BS / 2)
+        end
     end
-
-    for _, chunk_key in ipairs(self.processed_chunks) do
-        love.graphics.setColor(Color.CYAN)
-        local chunk_x, chunk_y = commons.parse_key(chunk_key)
-        chunk_x = chunk_x * CW * BS
-        chunk_y = chunk_y * CH * BS
-        love.graphics.rectangle("line", chunk_x, chunk_y, CW * BS, CH * BS)
-        love.graphics.setFont(fonts.orbitron[20])
-        love.graphics.print(chunk_key, chunk_x + CW * BS / 2, chunk_y + CH * BS / 2)
-    end
-
-    ::noborder::
 
     if self.lighting then
         self.light_surf = love.graphics.newImage(self.light_surf)
