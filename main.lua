@@ -11,6 +11,7 @@ local shaders = require("src.shaders")
 local world = require("src.world")
 local fonts = require("src.fonts")
 local systems = require("src.systems")
+local commons = require("src.libs.commons")
 
 ---------------------------------------------------------------------
 
@@ -27,15 +28,14 @@ ecs:create_entity(
         1
     ),
     comp.Sprite:from_path("res/images/player_animations/samurai/idle.png"),
-    comp.Hitbox:new(52, 80),
+    comp.Hitbox:new(52, 80),  -- static hitbox
     comp.CameraAnchor:new(0.04),  -- camera follows its position
-    comp.Controllable:new(),      -- can move using keyboard,
-    comp.Inventory:new({"supertorch", "torch", "supertorch"})         -- inventory to place blocks
+    comp.Controllable:new(),  -- can move using keyboard,
+    comp.Inventory:new({"torch", "torch", "supertorch"})  -- inventory to place blocks
 )
 
 local processed_chunks = {}
 local debug_rects = {}
-
 
 -- -- mandatory arguments
 -- obj.obj_path = kwargs.obj_path
@@ -80,13 +80,14 @@ function love.update(dt)
     -- other systems that don't just take (processed_chunks)
     systems.physics.process(processed_chunks, world)
     systems.editing.process(processed_chunks, world)
+    systems.controllable.process(processed_chunks, world)
     systems.process_misc_update_systems(processed_chunks)
 
     bench:finish(Color.CYAN)
 
     -- shaders
     -- shaders.default:send("lightDir", {0, 1, 0})
-    shaders.default:send("time", love.timer.getTime() * 0.1)
+    shaders.default:send("time", love.timer.getTime() *0.1)
     -- shaders.default:send("intensity", 1)
     -- shaders.default:send("pixelSize", (math.sin(love.timer.getTime() * 4) + 1) * 0.5 * 16)
     -- shaders.default:send("offset", 2)
@@ -111,6 +112,7 @@ function love.draw()
     love.graphics.setCanvas(CANVAS)
 
     -- reset the shader of the last frame
+    love.graphics.setShader()
 
     -- background color
     love.graphics.setColor({0.14, 0.12, 0.24})
@@ -119,14 +121,12 @@ function love.draw()
     -- from now on, all rendered entities are rendered with camera scroll
     love.graphics.push()
 
-    systems.controllable.process(processed_chunks, world)
     systems.camera.process(processed_chunks)
 
-    -- render world AFTER camera at least
     world:draw(systems._singletons.scroll)
 
-    -- debugging rects
     systems.late_rects.process()
+    systems.process_misc_draw_systems(processed_chunks)
 
     -- debug hitboxes
     for _, rect in ipairs(debug_rects) do
@@ -139,15 +139,8 @@ function love.draw()
     -- FPS, debug, etc.
     bench:draw()
 
-    -- imgui
-    imgui.begin("Settings", 10, 150, 140, 140)
+    systems.imgui.process({10, 150, 140, 140})
 
-    local _ = imgui.checkbox("Hitboxes")
-    local _ = imgui.checkbox("Borders")
-
-    imgui.end_()
-
-    love.graphics.setColor(Color.ORANGE)
     love.graphics.setFont(fonts.orbitron[24])
     love.graphics.print("FPS: " .. love.timer.getFPS(), 6, 6)
 
@@ -158,7 +151,7 @@ function love.draw()
     -- finish up
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.setCanvas()
-    love.graphics.setShader(shaders.default)
+    -- love.graphics.setShader(shaders.default)
     love.graphics.draw(CANVAS, 0, 0)
     love.graphics.setShader()
 end

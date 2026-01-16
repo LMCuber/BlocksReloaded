@@ -119,6 +119,9 @@ function commons.rand_rgb()
 end
 
 function commons.unpack(t, i)
+    if t == nil then
+        error "to-be-unpacked table can't be nil"
+    end
     i = i or 1
     if t[i] == nil then return end
     return t[i], unpack(t, i + 1)
