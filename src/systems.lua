@@ -95,11 +95,20 @@ end
 function systems.imgui.process(imgui_area)
     systems._singletons.dead_zone = imgui_area
 
-    -- imgui
     imgui.begin("Settings", commons.unpack(imgui_area))
+
+    imgui.setNextFont(fonts.orbitron)
+    imgui.label("FPS: " .. love.timer.getFPS())
+    for debug_type, debug_value in pairs(_G.debug_info) do
+        imgui.label(debug_type .. ": " .. debug_value)
+    end
+
+    imgui.hbar()
 
     imgui.checkbox("Hitboxes", config, "hitboxes")
     imgui.checkbox("Borders", config, "borders")
+    imgui.checkbox("Shaders", config, "shaders")
+    imgui.checkbox("Lighting", config, "lighting")
 
     imgui.end_()
 end

@@ -5,13 +5,11 @@ local Benchmarker = require("src.libs.benchmarker")
 local ecs = require("src.libs.ecs")
 local comp = require("src.components")
 local Model = require("src.3d_model")
-local neat = require("src.libs.neat")
-local imgui = require("src.libs.imgui")
 local shaders = require("src.shaders")
 local world = require("src.world")
 local fonts = require("src.fonts")
 local systems = require("src.systems")
-local commons = require("src.libs.commons")
+local config = require("src.config")
 
 ---------------------------------------------------------------------
 
@@ -54,7 +52,7 @@ function love.keypressed(key)
     if key == "escape" then
         love.event.quit()
     end
-    world.process_keypress(key)
+    world:process_keypress(key)
 end
 
 function love.load()
@@ -100,14 +98,6 @@ end
 
 ---------------------------------------------------------------------
 
-local function show_debug_info()
-    local y = 0
-    for debug_type, debug_value in pairs(_G.debug_info) do
-        love.graphics.print(debug_type .. ": " .. debug_value, 6, 80 + y * 22)
-        y = y + 1
-    end
-end
-
 function love.draw()
     love.graphics.setCanvas(CANVAS)
 
@@ -136,22 +126,17 @@ function love.draw()
 
     love.graphics.pop()
 
-    -- FPS, debug, etc.
-    bench:draw()
-
-    systems.imgui.process({10, 150, 140, 140})
-
-    love.graphics.setFont(fonts.orbitron[24])
-    love.graphics.print("FPS: " .. love.timer.getFPS(), 6, 6)
-
-    love.graphics.setFont(fonts.orbitron[18])
-
-    show_debug_info()
-
     -- finish up
-    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.setColor(Color.WHITE)
     love.graphics.setCanvas()
-    -- love.graphics.setShader(shaders.default)
+    if config.shaders then
+        love.graphics.setShader(shaders.default)
+    end
     love.graphics.draw(CANVAS, 0, 0)
     love.graphics.setShader()
+
+    -- post-shader text
+    bench:draw()
+    systems.imgui.process({0, 0, 160, 250})
+    love.graphics.setColor(Color.WHITE)
 end

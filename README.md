@@ -3,7 +3,7 @@ is a game
 
 ## Technical info
 - Language: LuaJIT 5.1
-- Library: [Love2D](https://love2d.org/)
+- Graphics library: [Love2D](https://love2d.org/)
 - Entities: proprietary ECS heavily inspired by [esper](https://github.com/benmoran56/esper) for Python (added chunk support)
 - World generation:
     - Resource management: chunking `N × N` areas (currently `16 × 16`)

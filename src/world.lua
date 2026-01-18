@@ -9,7 +9,6 @@ local systems = require("src.systems")
 local fonts = require("src.fonts")
 local commons = require("src.libs.commons")
 local yaml = require("src.libs.yaml")
-local shaders = require("src.shaders")
 local config = require("src.config")
 
 -- constants
@@ -83,9 +82,6 @@ function World:place_structure(structure, key, x, y)
 end
 
 function World:process_keypress(key)
-    if key == "space" then
-        self.lighting = not self.lighting
-    end
 end
 
 function World:octave_noise(args)
@@ -499,8 +495,10 @@ end
 
 function World:update(dt, scroll)
     self:get_processed_chunks(scroll)
-    if self.lighting then
+    if config.lighting then
         self:propagate_lighting(scroll)
+    else
+        _G.debug_info["light steps"] = "off"
     end
     return self.processed_chunks
 end
@@ -529,7 +527,7 @@ end
 
 function World:propagate_lighting(scroll)
     self.light_frame = self.light_frame + 1
-    if self.light_frame ~= 10 then
+    if self.light_frame ~= 1 then
         _G.debug_info["light steps"] = 0
         return
     end
@@ -625,7 +623,7 @@ function World:draw(scroll)
     -- clear the image batch and light surface
     self.batch:clear()
     self.bg_batch:clear()
-    if self.lighting then
+    if config.lighting then
         self.light_surf = love.image.newImageData(size_x, size_y)
     end
     local prints = {}
@@ -659,7 +657,7 @@ function World:draw(scroll)
             num_rendered_tiles = num_rendered_tiles + 1
 
             -- only overlay block with darkness if the block itself is not a light source
-            if self.lighting then
+            if config.lighting then
                 if nbwand(name, BF.LIGHT_SOURCE) or (name == "air" and bg_name ~= "air") then
                         self.light_surf:setPixel(
                         tx - min_x, ty - min_y,
@@ -711,7 +709,7 @@ function World:draw(scroll)
         end
     end
 
-    if self.lighting then
+    if config.lighting then
         self.light_surf = love.graphics.newImage(self.light_surf)
         -- self.light_surf:setFilter("nearest", "nearest")
         love.graphics.draw(self.light_surf, scroll.x + lighting_offset.x, scroll.y + lighting_offset.y, 0, BS, BS)
