@@ -527,7 +527,7 @@ end
 
 function World:propagate_lighting(scroll)
     self.light_frame = self.light_frame + 1
-    if self.light_frame ~= 1 then
+    if self.light_frame ~= 10 then
         _G.debug_info["light steps"] = 0
         return
     end
@@ -539,71 +539,80 @@ function World:propagate_lighting(scroll)
     local min_y = math.floor(scroll.y / BS) - VIEW_PADDING
     local max_y = math.floor((scroll.y + HEIGHT) / BS) + VIEW_PADDING
 
-    -- reset lightmap and light surface
+    -- reset lightmap
     self.lightmap = {}
     for ty = min_y, max_y do
         self.lightmap[ty] = {}
     end
 
-    -- BFS queue
-    local qx, qy, ql = {}, {}, {}
+    -- BFS queues
+    local qx, qy, ql, qd = {}, {}, {}, {} -- x, y, light, decay
     local head, tail = 1, 0
 
-    -- init air tiles
-    local grid_repr = {}
-    local grid_repr_bg = {}
-    bench:start(Color.RED)
-    for ty = min_y, max_y do
-        grid_repr[ty] = {}
-        grid_repr_bg[ty] = {}
+    -- cache tables
+    local light_data   = blocks.light_data
 
+    -- init tiles
+    for ty = min_y, max_y do
         for tx = min_x, max_x do
-            -- -- lighting stuff
-            local name = blocks.name[self:abs_pos_to_tile(tx, ty)]
+            local name    = blocks.name[self:abs_pos_to_tile(tx, ty)]
             local bg_name = blocks.name[self:abs_pos_to_bg_tile(tx, ty)]
 
-            grid_repr[ty][tx] = name
-            grid_repr_bg[ty][tx] = bg_name
+            local ld = light_data[name]
 
-            -- propagate light if the block is a light source
             if (name == "air" and bg_name == "air") or (name ~= "air" and bwand(name, BF.LIGHT_SOURCE)) then
-                self.lightmap[ty][tx] = MAX_LIGHT
+                local lv    = ld and ld.strength or MAX_LIGHT
+                local decay = ld and ld.decay or 1
+
+                self.lightmap[ty][tx] = lv
                 tail = tail + 1
-                qx[tail], qy[tail], ql[tail] = tx, ty, MAX_LIGHT
+                qx[tail], qy[tail], ql[tail], qd[tail] = tx, ty, lv, decay
             else
                 self.lightmap[ty][tx] = 0
             end
         end
     end
-    bench:finish(Color.RED)
 
-    -- BFS
+    -- BFS propagation
     local steps = 0
-    bench:start(Color.YELLOW)
     while head <= tail do
-        local x, y, lv = qx[head], qy[head], ql[head]
+        local x  = qx[head]
+        local y  = qy[head]
+        local lv = ql[head]
+        local d  = qd[head]
         head = head + 1
-        local n = {
-            {x + 1, y}, {x - 1, y}, {x, y + 1}, {x, y - 1}
-        }
-        for i = 1, #n do
-            local nx, ny = n[i][1], n[i][2]
-            if self.lightmap[ny] and self.lightmap[ny][nx] ~= nil then
-                -- local name = grid_repr[ny][nx]
-                -- local decay = blocks.light_decay[name] or 1  -- in case I missed an entry
-                local decay = 0.8
 
-                local pass_lv = lv - decay
-                if pass_lv > (self.lightmap[ny][nx] or 0) and pass_lv > 0 then
-                    steps = steps + 1
-                    self.lightmap[ny][nx] = pass_lv
-                    tail = tail + 1
-                    qx[tail], qy[tail], ql[tail] = nx, ny, pass_lv
+        local next_lv = lv - d
+        if next_lv <= 0 then
+            goto continue
+        end
+
+        -- neighbors
+        local neighbors = {
+            {x + 1, y}, {x - 1, y},
+            {x, y + 1}, {x, y - 1}
+        }
+
+        for i = 1, 4 do
+            local nx, ny = neighbors[i][1], neighbors[i][2]
+            local row = self.lightmap[ny]
+
+            if row then
+                local cur = row[nx]
+                if cur ~= nil then
+                    local pass_lv = next_lv
+                    if pass_lv > cur then
+                        steps = steps + 1
+                        row[nx] = pass_lv
+                        tail = tail + 1
+                        qx[tail], qy[tail], ql[tail], qd[tail] = nx, ny, pass_lv, d
+                    end
                 end
             end
         end
+
+        ::continue::
     end
-    bench:finish(Color.YELLOW)
 
     _G.debug_info["light steps"] = steps
 end
@@ -694,6 +703,7 @@ function World:draw(scroll)
     love.graphics.draw(self.batch)
 
     -- render the entities (render here so they work with the lightings)
+    -- local num_rendered_entities = systems.render.process(self.processed_chunks)
     local num_rendered_entities = systems.render.process(self.processed_chunks)
 
     -- render chunk border rectangles (visual)

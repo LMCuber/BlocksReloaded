@@ -1,4 +1,4 @@
-local Color = {
+local color = {
     ORANGE     = {1.00, 0.65, 0.00},
     RED        = {1.00, 0.00, 0.00},
     WHITE      = {1.00, 1.00, 1.00},
@@ -14,4 +14,4 @@ local Color = {
     LIGHT_NAVY = {54 / 255, 102 / 255, 150 / 255},
 }
 
-return Color
+return color
