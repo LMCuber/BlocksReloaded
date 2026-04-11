@@ -1,6 +1,7 @@
 ---@diagnostic disable: duplicate-set-field
-local Color = require("src.color")
+local color = require("src.color")
 local Vec2 = require("src.libs.vec2")
+local Vec3 = require("src.libs.vec3")
 local Benchmarker = require("src.libs.benchmarker")
 local ecs = require("src.libs.ecs")
 local comp = require("src.components")
@@ -11,6 +12,7 @@ local fonts = require("src.fonts")
 local systems = require("src.systems")
 local config = require("src.config")
 local joystick = require("src.joystick")
+local math = require("math")
 
 ---------------------------------------------------------------------
 
@@ -36,15 +38,15 @@ ecs:create_entity(
 local processed_chunks = {}
 local debug_rects = {}
 
--- -- mandatory arguments
--- obj.obj_path = kwargs.obj_path
--- obj.center = kwargs.center
--- obj.size = kwargs.size
+local o = 0.17 * math.pi
 local model = Model:new({
-    obj_path = "res/models/bracelet.obj",
-    center = Vec2:new(200, 200),
-    size = 24,
-    light = {0, -1, 0}
+    obj_path = "res/models/bcc.obj",
+    center = Vec2:new(500, 300),
+    size = 140,
+    light = {0, -1, 0},
+    angle = Vec3:new(o, o, 0),
+    avel = Vec3:new(0.0, 0.7, 0),
+    points = color.NAVY,
 })
 
 ---------------------------------------------------------------------
@@ -71,11 +73,11 @@ function love.update(dt)
 
     processed_chunks = world:update(dt, systems._singletons.scroll)
 
-    bench:start(Color.RED)
-    model:update()
-    bench:finish(Color.RED)
+    bench:start(color.PURPLE)
+    -- model:update()
+    bench:finish(color.PURPLE)
 
-    bench:start(Color.CYAN)
+    bench:start(color.CYAN)
 
     -- singletons first
     systems.singletons.process()
@@ -86,7 +88,7 @@ function love.update(dt)
     systems.controllable.process(processed_chunks, world)
     systems.process_misc_update_systems(processed_chunks)
 
-    bench:finish(Color.CYAN)
+    bench:finish(color.CYAN)
 
     -- shaders
     -- shaders.default:send("lightDir", {0, 1, 0})
@@ -121,7 +123,7 @@ function love.draw()
     love.graphics.setShader()
 
     -- model
-    model:draw()
+    -- model:draw()
 
     -- from now on, all rendered entities are rendered with camera scroll
     love.graphics.push()
@@ -135,14 +137,14 @@ function love.draw()
 
     -- debug hitboxes
     for _, rect in ipairs(debug_rects) do
-        love.graphics.setColor(rect[5] or Color.RED)
+        love.graphics.setColor(rect[5] or color.RED)
         love.graphics.rectangle("line", rect[1], rect[2], rect[3], rect[4])
     end
 
     love.graphics.pop()
 
     -- POST-CANVAS
-    love.graphics.setColor(Color.WHITE)
+    love.graphics.setColor(color.WHITE)
     love.graphics.setCanvas()
     love.graphics.draw(CANVAS, 0, 0)
     love.graphics.setShader()
@@ -150,5 +152,5 @@ function love.draw()
     -- post-shader text
     bench:draw()
     systems.imgui.process({0, 0, 160, 250})
-    love.graphics.setColor(Color.WHITE)
+    love.graphics.setColor(color.WHITE)
 end

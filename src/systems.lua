@@ -145,7 +145,7 @@ function systems.render.process(chunks)
             end
 
             local draw_x = math.floor(tr.pos.x - (img_w - hitbox.w) / 2)
-            local draw_y = math.floor(tr.pos.y - (img_h - hitbox.h) / 2)
+            local draw_y = math.floor(tr.pos.y - (img_h - hitbox.h) / 2) + (anim_data.offset or 0)
 
             -- player image
             love.graphics.setColor(1, 1, 1)

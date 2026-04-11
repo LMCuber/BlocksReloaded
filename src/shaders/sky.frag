@@ -32,6 +32,7 @@ vec4 effect(vec4 color, Image tex, vec2 uv, vec2 px) {
         ret = mix(sunsetColor, nightColor, (t - 0.75) / 0.25);
     }
     vec4 asd = vec4(ret.xyz, 1);
+    asd = vec4(0.51, 0.78, 0.9, 1);
     return asd;
 
     // return c * light;
