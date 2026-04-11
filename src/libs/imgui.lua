@@ -3,40 +3,80 @@ local fonts = require("src.fonts")
 local commons = require("src.libs.commons")
 
 local imgui = {}
-local window = {
-    x = 0,
-    y = 0,
+local state = {
+    -- defaults
+    padding = 8,
+    -- rest
     cursor_x = 0,
     cursor_y = 0,
+    width = 0,
+    height = 0,
     was_pressed = false,
+    font = nil,
+    font_size = 16,
 }
-local was_pressed = false
+
+-- LIFETIME
 
 function imgui.begin(window_name, cursor_x, cursor_y, width, height)
     -- setup
-    window.cursor_x = cursor_x
-    window.cursor_y = cursor_y
+    state.cursor_x = cursor_x
+    state.cursor_y = cursor_y + state.padding
+    state.width = width
+    state.height = height
     -- bg
     love.graphics.setColor{0.1, 0.1, 0.1, 0.8}
-    love.graphics.rectangle("fill", window.cursor_x, window.cursor_y, width, height)
+    love.graphics.rectangle("fill", state.cursor_x, state.cursor_y, width, height)
 end
 
 function imgui.end_()
-    window.was_pressed = love.mouse.isDown(1)
+    state.was_pressed = love.mouse.isDown(1)
+end
+
+-- CONFIG
+
+function imgui.setNextFont(font)
+    state.font = font
+end
+
+function imgui.setNextFontSize(font_size)
+    state.font_size = font_size
+end
+
+-- WIDGETS
+
+function imgui.hbar()
+    local h = 20
+    love.graphics.setColor(Color.WHITE)
+    love.graphics.line(state.cursor_x + 2, state.cursor_y + h / 2, state.cursor_x + state.width - 2, state.cursor_y + h / 2)
+    state.cursor_y = state.cursor_y + h
+end
+
+function imgui.label(text)
+    if state.font == nil then
+        error "Set font using setNextFont first"
+    end
+
+    local h = state.font_size + 8
+
+    love.graphics.setColor(Color.WHITE)
+    love.graphics.setFont(state.font[state.font_size])
+    love.graphics.print(text, state.cursor_x + state.padding, state.cursor_y)
+    state.cursor_y = state.cursor_y + h
 end
 
 function imgui.checkbox(text, config, attr)
     -- locals
     local w, h = 120, 24
     local cw = h - 6  -- cw is the checkbox width
-    local co = (h - cw) / 2  -- dist between checkbox and closest border of button
+    local co = (h - cw) / 2  -- dist between checkbox and left side of text
 
     -- bg
     love.graphics.setColor(Color.DARK_GRAY)
-    love.graphics.rectangle("fill", window.cursor_x, window.cursor_y, w, h)
+    love.graphics.rectangle("fill", state.cursor_x, state.cursor_y, w, h)
 
     -- checkbox
-    local checkbox = {window.cursor_x + co, window.cursor_y + co, cw, cw}
+    local checkbox = {state.cursor_x + state.padding, state.cursor_y + co, cw, cw}
     local is_col = commons.collidepointmouse(commons.unpack(checkbox))
     love.graphics.setColor(Color.NAVY)
     if is_col then
@@ -57,15 +97,15 @@ function imgui.checkbox(text, config, attr)
 
     -- text
     love.graphics.setColor(Color.WHITE)
-    love.graphics.setFont(fonts.orbitron[16])
-    love.graphics.print(text, window.cursor_x + cw + co * 2 + 4, window.cursor_y)
+    love.graphics.setFont(fonts.orbitron[state.font_size])
+    love.graphics.print(text, state.cursor_x + cw + state.padding * 2, state.cursor_y)
 
     -- advance cursor
-    window.cursor_y = window.cursor_y + h
+    state.cursor_y = state.cursor_y + h
 
     -- return if it is pressed
     local is_pressed = love.mouse.isDown(1)
-    if is_col and is_pressed and not window.was_pressed then
+    if is_col and is_pressed and not state.was_pressed then
         config[attr] = not config[attr]
     end
 end

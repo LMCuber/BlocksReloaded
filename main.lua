@@ -5,13 +5,12 @@ local Benchmarker = require("src.libs.benchmarker")
 local ecs = require("src.libs.ecs")
 local comp = require("src.components")
 local Model = require("src.3d_model")
-local neat = require("src.libs.neat")
-local imgui = require("src.libs.imgui")
 local shaders = require("src.shaders")
 local world = require("src.world")
 local fonts = require("src.fonts")
 local systems = require("src.systems")
-local commons = require("src.libs.commons")
+local config = require("src.config")
+local joystick = require("src.joystick")
 
 ---------------------------------------------------------------------
 
@@ -54,7 +53,7 @@ function love.keypressed(key)
     if key == "escape" then
         love.event.quit()
     end
-    world.process_keypress(key)
+    world:process_keypress(key)
 end
 
 function love.load()
@@ -72,6 +71,10 @@ function love.update(dt)
 
     processed_chunks = world:update(dt, systems._singletons.scroll)
 
+    bench:start(Color.RED)
+    model:update()
+    bench:finish(Color.RED)
+
     bench:start(Color.CYAN)
 
     -- singletons first
@@ -87,7 +90,8 @@ function love.update(dt)
 
     -- shaders
     -- shaders.default:send("lightDir", {0, 1, 0})
-    shaders.default:send("time", love.timer.getTime() *0.1)
+    shaders.sky:send("time", love.timer.getTime())
+    shaders.default:send("time", love.timer.getTime())
     -- shaders.default:send("intensity", 1)
     -- shaders.default:send("pixelSize", (math.sin(love.timer.getTime() * 4) + 1) * 0.5 * 16)
     -- shaders.default:send("offset", 2)
@@ -100,23 +104,24 @@ end
 
 ---------------------------------------------------------------------
 
-local function show_debug_info()
-    local y = 0
-    for debug_type, debug_value in pairs(_G.debug_info) do
-        love.graphics.print(debug_type .. ": " .. debug_value, 6, 80 + y * 22)
-        y = y + 1
-    end
-end
-
 function love.draw()
     love.graphics.setCanvas(CANVAS)
 
     -- reset the shader of the last frame
     love.graphics.setShader()
 
-    -- background color
+    -- background
+    if config.shaders then
+        love.graphics.setShader(shaders.sky)
+    end
     love.graphics.setColor({0.14, 0.12, 0.24})
     love.graphics.rectangle("fill", 0, 0, WIDTH, HEIGHT)
+
+    -- reset shader after sky
+    love.graphics.setShader()
+
+    -- model
+    model:draw()
 
     -- from now on, all rendered entities are rendered with camera scroll
     love.graphics.push()
@@ -136,22 +141,14 @@ function love.draw()
 
     love.graphics.pop()
 
-    -- FPS, debug, etc.
-    bench:draw()
-
-    systems.imgui.process({10, 150, 140, 140})
-
-    love.graphics.setFont(fonts.orbitron[24])
-    love.graphics.print("FPS: " .. love.timer.getFPS(), 6, 6)
-
-    love.graphics.setFont(fonts.orbitron[18])
-
-    show_debug_info()
-
-    -- finish up
-    love.graphics.setColor(1, 1, 1, 1)
+    -- POST-CANVAS
+    love.graphics.setColor(Color.WHITE)
     love.graphics.setCanvas()
-    -- love.graphics.setShader(shaders.default)
     love.graphics.draw(CANVAS, 0, 0)
     love.graphics.setShader()
+
+    -- post-shader text
+    bench:draw()
+    systems.imgui.process({0, 0, 160, 250})
+    love.graphics.setColor(Color.WHITE)
 end

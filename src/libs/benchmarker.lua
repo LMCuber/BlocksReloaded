@@ -39,14 +39,15 @@ function Benchmarker:draw()
         sum = sum + time
     end
 
+    local xo = 180
     for key, time in pairs(times) do
         local w = time / sum * self.width
         love.graphics.setColor(key)
-        love.graphics.rectangle("fill", 10 + total_w, 46, w, 20)
+        love.graphics.rectangle("fill", xo + total_w, 46, w, 20)
         total_w = total_w + w
     end
     love.graphics.setColor(Color.BLACK)
-    love.graphics.rectangle("line", 10, 46, self.width, 20)
+    love.graphics.rectangle("line", xo, 46, self.width, 20)
 
     self.times = {}
 end

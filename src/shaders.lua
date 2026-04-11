@@ -1,9 +1,12 @@
 local shaders = {}
 
-local code
-code = love.filesystem.read("src/shaders/default.frag")
-shaders.default = love.graphics.newShader(code)
-code = love.filesystem.read("src/shaders/lighting.frag")
-shaders.lighting = love.graphics.newShader(code)
+local function load_shader(path, name)
+    local code = love.filesystem.read(path)
+    shaders[name] = love.graphics.newShader(code)
+end
+
+load_shader("src/shaders/default.frag", "default")
+load_shader("src/shaders/lighting.frag", "lighting")
+load_shader("src/shaders/sky.frag", "sky")
 
 return shaders
