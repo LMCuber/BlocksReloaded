@@ -130,7 +130,8 @@ local tokens = {
   {"string",    "^%b[] *[^,%c]+", noinline = true},
   {"[",         "^%["},
   {"]",         "^%]"},
-  {"-",         "^%-", noinline = true},
+  -- {"-",         "^%-", noinline = true},
+  {"-",         "^%-(%s)", noinline = true},  -- so it doesn't match negative numbers e.g. -6]
   {":",         "^:"},
   {"pipe",      "^(|)(%d*[+%-]?)", sep = "\n"},
   {"pipe",      "^(>)(%d*[+%-]?)", sep = " "},
@@ -176,6 +177,12 @@ exports.tokenize = function (str)
           token.raw = token.raw:sub(1, #token.raw - #token[2][2])
           -- Trim
           token[2][1] = string_trim(token[2][1])
+        
+        elseif token[1] == "-" then
+          -- Re-add the captured whitespace to the front of the string
+          str = token[2][1] .. str
+          token.raw = token.raw:sub(1, #token.raw - #token[2][1])
+
         elseif token[1] == "string" then
           -- Finding numbers
           local snip = token[2][1]

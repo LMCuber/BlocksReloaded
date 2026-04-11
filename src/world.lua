@@ -550,7 +550,7 @@ function World:propagate_lighting(scroll)
     local head, tail = 1, 0
 
     -- cache tables
-    local light_data   = blocks.light_data
+    local light_data = blocks.light_data
 
     -- init tiles
     for ty = min_y, max_y do
@@ -602,10 +602,10 @@ function World:propagate_lighting(scroll)
                 if cur ~= nil then
                     local pass_lv = next_lv
                     if pass_lv > cur then
-                        steps = steps + 1
                         row[nx] = pass_lv
                         tail = tail + 1
                         qx[tail], qy[tail], ql[tail], qd[tail] = nx, ny, pass_lv, d
+                        steps = steps + 1
                     end
                 end
             end
