@@ -28,7 +28,7 @@ ecs:create_entity(
         Vec2:new(0, 0),
         1
     ),
-    comp.Sprite:from_path("res/images/player_animations/samurai/idle.png"),
+    comp.Sprite:from_path("res/images/player_animations/samurai/_default_run.png"),
     comp.Hitbox:new(52, 80),  -- static hitbox
     comp.CameraAnchor:new(0.04),  -- camera follows its position
     comp.Controllable:new(),  -- can move using keyboard,
