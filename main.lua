@@ -143,7 +143,7 @@ function love.draw()
 
     love.graphics.setFont(fonts.orbitron[24])
     love.graphics.print("FPS: " .. love.timer.getFPS(), 6, 6)
-
+    
     love.graphics.setFont(fonts.orbitron[18])
 
     show_debug_info()

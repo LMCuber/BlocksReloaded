@@ -8,6 +8,7 @@ _G.BPS = 10
 _G.S = 3
 _G.BS = BPS * S
 _G.WIDTH, _G.HEIGHT = love.graphics.getDimensions()
+_G.MAX_LIGHT = 15
 
 -- BLOCK FLAGS
 _G.BF = {
@@ -19,6 +20,7 @@ _G.BF = {
     ORNAMENT     = 0,  -- flowers, rocks, etc. Subset of "walkable".
     UNBREAKABLE  = 0,  -- blackstone etc.
 }
+
 -- set the enum values from 0 to powers of 2 (they are initialized at 0 by defaylt)
 local exp = 0
 for block, _ in pairs(BF) do
@@ -47,7 +49,6 @@ for name, flag in pairs(flags) do
 end
 
 -- lighting data
-_G.MAX_LIGHT = 15
 local light_decay = {
     air = 1,
     torch = 0.6,
