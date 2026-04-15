@@ -112,8 +112,9 @@ local tokens = {
   {"null",      word("Null"),     const = true, value = nil},
   {"null",      word("NULL"),     const = true, value = nil},
   {"null",      word("~"),        const = true, value = nil},
-  {"id",    "^\"([^\"]-)\" *(:[%s%c])"},
-  {"id",    "^'([^']-)' *(:[%s%c])"},
+  {"id",        "^\"([^\"]-)\" *(:[%s%c])"},
+  {"id",        "^'([^']-)' *(:[%s%c])"},
+  {"id",        "^([%w_][%w %-_]*)(:[%s%c])"},
   {"string",    "^\"([^\"]-)\"",  force_text = true},
   {"string",    "^'([^']-)'",    force_text = true},
   {"timestamp", "^(%d%d%d%d)-(%d%d?)-(%d%d?)%s+(%d%d?):(%d%d):(%d%d)%s+(%-?%d%d?):(%d%d)"},
@@ -135,7 +136,6 @@ local tokens = {
   {":",         "^:"},
   {"pipe",      "^(|)(%d*[+%-]?)", sep = "\n"},
   {"pipe",      "^(>)(%d*[+%-]?)", sep = " "},
-  {"id",        "^([%w][%w %-_]*)(:[%s%c])"},
   {"string",    "^[^%c]+", noinline = true},
   {"string",    "^[^,%]}%c ]+"}
 };
