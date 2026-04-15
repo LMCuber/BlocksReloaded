@@ -8,10 +8,12 @@ luac.out
 *.tar.gz
 
 # Object files
+# WHAT THE FUUUCK WHY .OBJ FILES BRO IM MAKIKNG A FUCKING GAME
+# WHY CAN AN .OBJ FILE MEAN MULTIPLE THINGS BROO
 *.o
 *.os
 *.ko
-*.obj
+# *.obj
 *.elf
 
 # Precompiled Headers
