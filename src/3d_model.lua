@@ -136,6 +136,7 @@ function Model:new(kwargs)
     -- obj.light = commons.map(obj.light, function (x) return -x / commons.length(obj.light) end)
     obj.angle = kwargs.angle or Vec3:new(0.0, 0.0, 0.0)
     obj.avel = kwargs.avel or Vec3:new(2.0, 2.0, 2.0)
+    obj.points = kwargs.color or nil
     obj.kwargs = kwargs
 
     -- material attributes
@@ -394,22 +395,24 @@ function Model:draw()
         end
     end
 
-    if self.kwargs.points then
-        -- draw circles at vertices
-        love.graphics.setColor(Color.RED)
-        for _, vertex in ipairs(self.updated_vertices) do
-            local draw_x = self.center.x + vertex[1] * self.size
-            local draw_y = self.center.y + vertex[2] * self.size
-            love.graphics.circle("fill", draw_x, draw_y, 12)
-        end
-    end
-
+    -- draw the lines first
     for _, vert_indices in ipairs(self.lines) do
         local p1 = self.draw_vertices[vert_indices[1]]
         local p2 = self.draw_vertices[vert_indices[2]]
         love.graphics.setColor(Color.ORANGE)
         love.graphics.line(p1[1], p1[2], p2[1], p2[2])
         love.graphics.setColor(Color.WHITE)
+    end
+
+    -- draw then the point circles
+    if self.kwargs.points ~= nil then
+        -- draw circles at vertices
+        love.graphics.setColor(self.kwargs.points)
+        for _, vertex in ipairs(self.updated_vertices) do
+            local draw_x = self.center.x + vertex[1] * self.size
+            local draw_y = self.center.y + vertex[2] * self.size
+            love.graphics.circle("fill", draw_x, draw_y, 12)
+        end
     end
 end
 

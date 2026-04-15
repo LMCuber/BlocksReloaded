@@ -49,10 +49,11 @@ for name, flag in pairs(flags) do
 end
 
 -- lighting data
-local light_decay = {
-    air = 1,
-    torch = 0.6,
-    supertorch = 1,
+_G.MAX_LIGHT = 15
+local light_data = {
+    air =        {strength = MAX_LIGHT, decay = 1},
+    torch =      {strength = 15, decay = 0.6},
+    supertorch = {strength = MAX_LIGHT, decay = 0.6},
 }
 
 -- functions
@@ -91,7 +92,7 @@ local blocks = {
     quads = {},
     id = {},
     name = {},
-    light_decay = light_decay,
+    light_data = light_data,
 }
 blocks.sprs:setFilter("nearest", "nearest")
 

@@ -95,11 +95,20 @@ end
 function systems.imgui.process(imgui_area)
     systems._singletons.dead_zone = imgui_area
 
-    -- imgui
     imgui.begin("Settings", commons.unpack(imgui_area))
+
+    imgui.setNextFont(fonts.orbitron)
+    imgui.label("FPS: " .. love.timer.getFPS())
+    for debug_type, debug_value in pairs(_G.debug_info) do
+        imgui.label(debug_type .. ": " .. debug_value)
+    end
+
+    imgui.hbar()
 
     imgui.checkbox("Hitboxes", config, "hitboxes")
     imgui.checkbox("Borders", config, "borders")
+    imgui.checkbox("Shaders", config, "shaders")
+    imgui.checkbox("Lighting", config, "lighting")
 
     imgui.end_()
 end
@@ -136,7 +145,7 @@ function systems.render.process(chunks)
             end
 
             local draw_x = math.floor(tr.pos.x - (img_w - hitbox.w) / 2)
-            local draw_y = math.floor(tr.pos.y - (img_h - hitbox.h) / 2)
+            local draw_y = math.floor(tr.pos.y - (img_h - hitbox.h) / 2) + (anim_data.offset or 0)
 
             -- player image
             love.graphics.setColor(1, 1, 1)

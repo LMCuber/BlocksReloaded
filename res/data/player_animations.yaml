@@ -2,28 +2,35 @@
 # DEFAULT:
 #     speed: 0.088
 
-nutcracker:
-    run:
-        frames: 8
-        offset: -6
+dexter:
     idle:
         frames: 4
-        offset: -4
+        offset: 3
+    run:
+        frames: 4
+        offset: 3
 
-samurai:
+nutcracker:
+    idle:
+        frames: 4
+        offset: 1
     run:
         frames: 8
-        offset: -6
+        offset: 0
+
+samurai:
     idle:
         frames: 2
-        offset: -4
-        speed: 0.012
+        offset: 1
+        speed: 4
+    run:
+        frames: 8
+        offset: 0
 
 ra:
     idle:
         frames: 2
         offset: -15
-    
     run:
         frames: 4
         offset: -15
