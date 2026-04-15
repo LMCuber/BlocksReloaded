@@ -34,7 +34,8 @@ function World:new()
     obj.bg_data = {}
     obj.lightmap = {}
     obj.light_surf = nil
-    obj.lighting = true
+    -- obj.lighting = true
+    obj.lighting = false
     obj.light_frame = 0
 
     obj.batch = love.graphics.newSpriteBatch(blocks.sprs, 1000)
