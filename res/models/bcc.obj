@@ -1,0 +1,45 @@
+# Body-Centered Cubic (BCC) Unit Cell
+# Normalized around the origin (-0.5 to 0.5)
+
+# Corner vertices
+v -0.5 -0.5 -0.5
+v  0.5 -0.5 -0.5
+v  0.5  0.5 -0.5
+v -0.5  0.5 -0.5
+v -0.5 -0.5  0.5
+v  0.5 -0.5  0.5
+v  0.5  0.5  0.5
+v -0.5  0.5  0.5
+
+# Body-center vertex
+v  0.0  0.0  0.0
+
+# --- Cube edges (12 edges) ---
+
+# Bottom face
+l 1 2
+l 2 3
+l 3 4
+l 4 1
+
+# Top face
+l 5 6
+l 6 7
+l 7 8
+l 8 5
+
+# Vertical edges
+l 1 5
+l 2 6
+l 3 7
+l 4 8
+
+# --- Body-center bonds to all 8 corners ---
+l 9 1
+l 9 2
+l 9 3
+l 9 4
+l 9 5
+l 9 6
+l 9 7
+l 9 8
