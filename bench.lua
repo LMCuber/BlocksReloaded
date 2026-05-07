@@ -134,7 +134,6 @@ function World:draw(camera, screenW, screenH)
             local l = math.min(light, 1)
 
             if tile == 1 then
-                
                 love.graphics.setColor(1, 1, 1, 1)
                 love.graphics.draw(tileset, quads.soil, tx*TILE, ty*TILE, 0, 3, 3)
                 love.graphics.setColor(0, 0, 0, 1 - l)
@@ -209,5 +208,5 @@ function love.draw()
 
     -- FPS
     love.graphics.setColor(1,1,1)
-    love.graphics.print("FPS: "..tostring(love.timer.getFPS()), 10,10)
+    love.graphics.print("FPS: "..tostring(love.timer.getFPS()), 10, 10)
 end

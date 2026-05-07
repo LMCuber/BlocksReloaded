@@ -105,22 +105,24 @@ function systems.imgui.process(imgui_area)
 
     imgui.hbar()
 
-    imgui.checkbox("Hitboxes", config, "hitboxes")
-    imgui.checkbox("Borders", config, "borders")
-    imgui.checkbox("Shaders", config, "shaders")
-    imgui.checkbox("Lighting", config, "lighting")
+    -- create an imgui checkbox per config item
+    for name, _ in pairs(config) do
+        imgui.checkbox(commons.capitalize(name), config, name)
+    end
 
     imgui.end_()
 end
 
 function systems.render.process(chunks)
     local num_rendered = 0
+    local num_updated = 0
 
     for _, entry in ipairs(ecs:get_components(chunks, comp.Transform, comp.Sprite)) do
         local ent_id, chunk, tr, sprite = commons.unpack(entry)
 
         local anim_data = anim.get(sprite.anim_skin, sprite.anim_mode)
 
+        -- animate the sprite
         sprite.anim = sprite.anim + anim_data.speed * _G.dt
         if sprite.anim > anim_data.frames + 1 then
             sprite.anim = 1
@@ -146,8 +148,15 @@ function systems.render.process(chunks)
 
             local draw_x = math.floor(tr.pos.x - (img_w - hitbox.w) / 2)
             local draw_y = math.floor(tr.pos.y - (img_h - hitbox.h) / 2) + (anim_data.offset or 0)
+            local vp_x = draw_x - sg.scroll.x
+            local vp_y = draw_y - sg.scroll.y
 
-            -- player image
+            -- check if the image is even on the viewport
+            if (vp_x + img_w < 0 or vp_x > WIDTH or vp_y + img_h < 0 or vp_y > HEIGHT) then
+                goto norender
+            end
+
+            -- render the image
             love.graphics.setColor(1, 1, 1)
             love.graphics.draw(
                 anim_data.sprs,
@@ -180,10 +189,13 @@ function systems.render.process(chunks)
 
         num_rendered = num_rendered + 1
 
+        ::norender::
+        num_updated = num_updated + 1
+
         ::continue::
     end
 
-    return num_rendered
+    return num_rendered, num_updated
 end
 
 function systems.physics.process(chunks, world)
@@ -192,63 +204,79 @@ function systems.physics.process(chunks, world)
     for _, entry in ipairs(ecs:get_components(chunks, comp.Transform, comp.Sprite, comp.Hitbox)) do
         local _, _, tr, sprite, hitbox = commons.unpack(entry)
 
-        -- make sure the hitbox has a size (the first time it is set from dynamic to something concrete)
+        -- initialize dynamic hitbox
         if hitbox.is_dynamic then
             local anim_data = anim.get(sprite.anim_skin, sprite.anim_mode)
             local _, _, w, h = anim_data.quads[math.floor(sprite.anim)]:getViewport()
-            -- account for pixel art scaling
-            hitbox.w = w * S
-            hitbox.h = h * S
+            hitbox.w, hitbox.h = w * S, h * S
             hitbox.is_dynamic = false
         end
 
-        -- y-collision
+        -- --- Y-COLLISION ---
         tr.vel.y = tr.vel.y + tr.gravity * _G.dt
         tr.pos.y = tr.pos.y + tr.vel.y * _G.dt
 
-        table.insert(debug_rects, {tr.pos.x, tr.pos.y, hitbox.w, hitbox.h})
+        -- calculate tile boundaries
+        local min_tx = math.floor(tr.pos.x / BS)
+        local max_tx = math.floor((tr.pos.x + hitbox.w - 1) / BS)
+        local min_ty = math.floor(tr.pos.y / BS)
+        local max_ty = math.floor((tr.pos.y + hitbox.h - 1) / BS)
 
-        for _, block_pos in ipairs(world:get_blocks_around_pos(
-            tr.pos.x + hitbox.w / 2,
-            tr.pos.y + hitbox.h / 2
-        )) do
-            local block_hitbox = comp.Hitbox:new(BS, BS)
+        for ty = min_ty, max_ty do
+            for tx = min_tx, max_tx do
+                local tile_id = world:abs_pos_to_tile(tx, ty)
+                local name = blocks.name[tile_id]
 
-            table.insert(debug_rects, {block_pos.x, block_pos.y, BS, BS, {1, 0.7, 0}})
-
-            -- entity hitbox against block hitbox (block hitbox is the argument)
-            if hitbox:aabb(tr.pos.x, tr.pos.y, block_hitbox, block_pos.x, block_pos.y) then
-                if tr.vel.y > 0 then
-                    tr.pos.y = block_pos.y - hitbox.h
-                else
-                    tr.pos.y = block_pos.y + BS
+                if name and nbwand(name, BF.WALKABLE) then
+                    local bx, by = tx * BS, ty * BS
+                    if hitbox:aabb(tr.pos.x, tr.pos.y, blocks.HITBOX, bx, by) then
+                        table.insert(sg.late_rects, {bx, by, BS, BS, Color.PURPLE})
+                        if tr.vel.y > 0 then
+                            tr.pos.y = by - hitbox.h
+                        else
+                            tr.pos.y = by + BS
+                        end
+                        tr.vel.y = 0
+                    end
                 end
-                tr.vel.y = 0
             end
         end
 
-        -- x-collision
+        -- --- X-COLLISION ---
         tr.pos.x = tr.pos.x + tr.vel.x * _G.dt
 
-        table.insert(debug_rects, {tr.pos.x, tr.pos.y, hitbox.w, hitbox.h})
+        -- (recalculate tile boundaries)
+        min_tx = math.floor(tr.pos.x / BS)
+        max_tx = math.floor((tr.pos.x + hitbox.w - 1) / BS)
+        min_ty = math.floor(tr.pos.y / BS)
+        max_ty = math.floor((tr.pos.y + hitbox.h - 1) / BS)
 
-        for _, block_pos in ipairs(world:get_blocks_around_pos(
-            tr.pos.x + hitbox.w / 2,
-            tr.pos.y + hitbox.h / 2
-        )) do
-            local block_hitbox = comp.Hitbox:new(BS, BS)
+        for ty = min_ty, max_ty do
+            for tx = min_tx, max_tx do
+                local tile_id = world:abs_pos_to_tile(tx, ty)
+                local name = blocks.name[tile_id]
 
-            table.insert(debug_rects, {block_pos.x, block_pos.y, BS, BS, {1, 0.7, 0}})
-
-            -- entity hitbox against block hitbox (block hitbox is the argument)
-            if hitbox:aabb(tr.pos.x, tr.pos.y, block_hitbox, block_pos.x, block_pos.y) then
-                if tr.vel.x > 0 then
-                    tr.pos.x = block_pos.x - hitbox.w
-                else
-                    tr.pos.x = block_pos.x + BS
+                if name and nbwand(name, BF.WALKABLE) then
+                    local bx, by = tx * BS, ty * BS
+                    if hitbox:aabb(tr.pos.x, tr.pos.y, blocks.HITBOX, bx, by) then
+                        table.insert(sg.late_rects, {bx, by, BS, BS, Color.PURPLE})
+                        if tr.vel.x > 0 then
+                            tr.pos.x = bx - hitbox.w
+                        else
+                            tr.pos.x = bx + BS
+                        end
+                        tr.vel.x = 0
+                    end
                 end
             end
         end
+
+        -- debug
+        if config.hitboxes then
+            table.insert(sg.late_rects, {tr.pos.x, tr.pos.y, BS, BS, Color.ORANGE})
+        end
+
+        ::continue::
     end
 
     return debug_rects

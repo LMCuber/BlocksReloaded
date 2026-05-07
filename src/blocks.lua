@@ -1,9 +1,10 @@
 local bit = require("bit")
 local commons = require("src.libs.commons")
+local comp = require("src.components")
 
 -- CONSTANTS
 _G.CW = 16
-_G.CH = 16
+_G.CH = 32
 _G.BPS = 10
 _G.S = 3
 _G.BS = BPS * S
@@ -93,6 +94,7 @@ local blocks = {
     id = {},
     name = {},
     light_data = light_data,
+    HITBOX = comp.Hitbox:new(BS, BS),
 }
 blocks.sprs:setFilter("nearest", "nearest")
 

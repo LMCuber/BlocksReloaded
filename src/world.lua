@@ -22,8 +22,9 @@ World.__index = World
     key = "1,0" (chunk key)
     chunk_pos = {1, 0}
     rel_x, rel_y = 1..CW, 1..CH
-    pitch = rel_x, rel_y
-    timbre = key, pitch
+    pitch = (rel_x, rel_y)
+    timbre = (key, pitch)
+    ^^^ this drilla is so smart omg ^^^
 ]]
 function World:new()
     local obj = setmetatable({}, self)
@@ -348,7 +349,7 @@ function World:modify_chunk(key)
                 end
 
                 -- entities
-                if chance(1 / 10) then
+                if chance(1 / 120) then
                     for i = 1, 1 do
                         ecs:create_entity(
                             key,
@@ -362,19 +363,22 @@ function World:modify_chunk(key)
                     end
                 end
 
-                if chance(1 / 120) then
-                    ecs:create_entity(
-                        key,
-                        comp.Transform:new(
-                            Vec2:new(abs_x * BS, (abs_y - 7) * BS),
-                            Vec2:new(200, 0)
-                        ),
-                        comp.Sprite:from_path("res/images/mobs/chicken/walk.png"),
-                        comp.Hitbox:dynamic()
-                    )
+                if chance(1 / 1) then
+                    for _ = 1, 5 do
+                        ecs:create_entity(
+                            key,
+                            comp.Transform:new(
+                                Vec2:new(abs_x * BS, (abs_y - 7) * BS),
+                                Vec2:new(0),
+                                1
+                            ),
+                            comp.Sprite:from_path("res/images/mobs/chicken/walk.png"),
+                            comp.Hitbox:dynamic()
+                        )
+                    end
                 end
 
-                if chance(1 / 10) then
+                if chance(1 / 1000) then
                     ecs:create_entity(
                         key,
                         comp.Transform:new(
@@ -465,23 +469,6 @@ function World:mouse_to_timbre(mx, my, scroll)
     return key, rel_x, rel_y
 end
 
-function World:get_blocks_around_pos(x, y, o)
-    local positions = {}
-    o = o or 3
-    for yo = -o, o do
-        for xo = -o, o do
-            local tx = math.floor(x / BS) + xo
-            local ty = math.floor(y / BS) + yo
-            local name = blocks.name[self:abs_pos_to_tile(tx, ty)]
-
-            if name ~= nil and nbwand(name, BF.WALKABLE) then
-                table.insert(positions, Vec2:new(tx * BS, ty * BS))
-            end
-        end
-    end
-    return positions
-end
-
 function World:place(key, block_x, block_y, name)
     self.data[key][block_x][block_y] = blocks.id[name]
 end
@@ -528,8 +515,9 @@ end
 
 function World:propagate_lighting(scroll)
     self.light_frame = self.light_frame + 1
-    if self.light_frame ~= 10 then
-        _G.debug_info["light steps"] = 0
+    if self.light_frame < 10 then
+        -- skip frame if it's not the 10th (the higher, the less accurate, but the faster the lighting)
+        _G.debug_info["light steps"] = "----"
         return
     end
     self.light_frame = 0
@@ -574,6 +562,12 @@ function World:propagate_lighting(scroll)
         end
     end
 
+    -- setup variables
+    local offsets = {
+        {1, 0}, {-1, 0},
+        {0, 1}, {0, -1},
+    }
+
     -- BFS propagation
     local steps = 0
     while head <= tail do
@@ -588,14 +582,9 @@ function World:propagate_lighting(scroll)
             goto continue
         end
 
-        -- neighbors
-        local neighbors = {
-            {x + 1, y}, {x - 1, y},
-            {x, y + 1}, {x, y - 1}
-        }
-
         for i = 1, 4 do
-            local nx, ny = neighbors[i][1], neighbors[i][2]
+            local off = offsets[i]
+            local nx, ny = x + off[1], y + off[2]
             local row = self.lightmap[ny]
 
             if row then
@@ -619,7 +608,7 @@ function World:propagate_lighting(scroll)
 end
 
 function World:draw(scroll)
-    bench:start(Color.LIME)
+    -- bench:start(Color.LIME)
 
     -- B L O C K S
     local min_x = math.floor(scroll.x / BS)
@@ -638,8 +627,6 @@ function World:draw(scroll)
     end
     local prints = {}
     local num_rendered_tiles = 0
-
-    local last = love.timer.getTime()
 
     for ty = min_y, max_y do
         for tx = min_x, max_x do
@@ -704,8 +691,9 @@ function World:draw(scroll)
     love.graphics.draw(self.batch)
 
     -- render the entities (render here so they work with the lightings)
-    -- local num_rendered_entities = systems.render.process(self.processed_chunks)
-    local num_rendered_entities = systems.render.process(self.processed_chunks)
+    bench:start(Color.NAVY)
+    local num_rendered_entities, num_updated_entities = systems.render.process(self.processed_chunks)
+    bench:finish(Color.NAVY)
 
     -- render chunk border rectangles (visual)
     if config.borders then
@@ -728,9 +716,10 @@ function World:draw(scroll)
 
     love.graphics.setColor(Color.WHITE)
 
-    bench:finish(Color.LIME)
+    -- bench:finish(Color.LIME)
 
-    _G.debug_info["entities"] = num_rendered_entities
+    _G.debug_info["R. entities"] = num_rendered_entities
+    _G.debug_info["U. entities"] = num_updated_entities
     _G.debug_info["tiles"] = num_rendered_tiles
 end
 

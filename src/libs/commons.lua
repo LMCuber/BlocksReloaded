@@ -209,4 +209,8 @@ function commons.collidepointmouse(rx, ry, rw, rh)
            py <= ry + rh
 end
 
+function commons.capitalize(str)
+    return str:sub(1, 1):upper() .. str:sub(2)
+end
+
 return commons

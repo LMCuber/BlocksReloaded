@@ -1,8 +1,9 @@
 local config = {
-    hitboxes = true,
+    hitboxes = false,
     borders = false,
     shaders = false,
-    lighting = true,
+    lighting = false,
+    physics = true,
 }
 
 return config

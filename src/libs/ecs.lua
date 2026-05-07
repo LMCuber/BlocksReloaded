@@ -1,4 +1,5 @@
 local commons = require("src.libs.commons")
+local Color = require("src.color")
 
 local entity_manager = {
     counter = 0,

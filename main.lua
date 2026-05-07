@@ -36,7 +36,6 @@ ecs:create_entity(
 )
 
 local processed_chunks = {}
-local debug_rects = {}
 
 local o = 0.17 * math.pi
 local model = Model:new({
@@ -62,7 +61,6 @@ function love.load()
     _G.CANVAS = love.graphics.newCanvas(love.graphics.getWidth(), love.graphics.getHeight())
     local icon = love.image.newImageData("res/images/visuals/windows_icon.png")
     love.window.setIcon(icon)
-    love.graphics.setBackgroundColor(1, 1, 1, 0)
 end
 
 -------
@@ -73,34 +71,23 @@ function love.update(dt)
 
     processed_chunks = world:update(dt, systems._singletons.scroll)
 
-    bench:start(color.PURPLE)
-    -- model:update()
-    bench:finish(color.PURPLE)
-
-    bench:start(color.CYAN)
-
     -- singletons first
     systems.singletons.process()
 
-    -- other systems that don't just take (processed_chunks)
-    systems.physics.process(processed_chunks, world)
+    -- other systems that don't just take processed_chunks as argument
+    bench:start(color.OLIVE)
+    if config.physics then
+        systems.physics.process(processed_chunks, world)
+    end
+    bench:finish(color.OLIVE, false)
+
     systems.editing.process(processed_chunks, world)
     systems.controllable.process(processed_chunks, world)
     systems.process_misc_update_systems(processed_chunks)
 
-    bench:finish(color.CYAN)
-
     -- shaders
-    -- shaders.default:send("lightDir", {0, 1, 0})
     shaders.sky:send("time", love.timer.getTime())
     shaders.default:send("time", love.timer.getTime())
-    -- shaders.default:send("intensity", 1)
-    -- shaders.default:send("pixelSize", (math.sin(love.timer.getTime() * 4) + 1) * 0.5 * 16)
-    -- shaders.default:send("offset", 2)
-    -- shaders.default:send("threshold", 0.4)
-    -- shaders.default:send("time", love.timer.getTime());
-    -- shaders.default:send("resolution", {love.graphics.getWidth(), love.graphics.getHeight()});
-    -- shaders.default:send("k", 0.05);
     shaders.default:send("levels", 16);
 end
 
@@ -122,9 +109,6 @@ function love.draw()
     -- reset shader after sky
     love.graphics.setShader()
 
-    -- model
-    -- model:draw()
-
     -- from now on, all rendered entities are rendered with camera scroll
     love.graphics.push()
 
@@ -132,14 +116,11 @@ function love.draw()
 
     world:draw(systems._singletons.scroll)
 
-    systems.late_rects.process()
-    systems.process_misc_draw_systems(processed_chunks)
-
-    -- debug hitboxes
-    for _, rect in ipairs(debug_rects) do
-        love.graphics.setColor(rect[5] or color.RED)
-        love.graphics.rectangle("line", rect[1], rect[2], rect[3], rect[4])
+    -- a batch of rectangles sent by the systems to render at once
+    if config.hitboxes then
+        systems.late_rects.process()
     end
+    systems.process_misc_draw_systems(processed_chunks)
 
     love.graphics.pop()
 
@@ -151,6 +132,6 @@ function love.draw()
 
     -- post-shader text
     bench:draw()
-    systems.imgui.process({0, 0, 160, 250})
+    systems.imgui.process({0, 0, 160, 280})
     love.graphics.setColor(color.WHITE)
 end
