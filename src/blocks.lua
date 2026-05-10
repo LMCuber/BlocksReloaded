@@ -20,6 +20,7 @@ _G.BF = {
     ORE          = 0,  -- coal, titanium, diamond, etc.
     ORNAMENT     = 0,  -- flowers, rocks, etc. Subset of "walkable".
     UNBREAKABLE  = 0,  -- blackstone etc.
+    SOLID        = 0
 }
 
 -- set the enum values from 0 to powers of 2 (they are initialized at 0 by defaylt)

@@ -22,13 +22,16 @@ function ecs:try_component(ent_id, comp_type)
     return entity_manager.entities[ent_id][comp_type._name]
 end
 
-function ecs:_get_components(chunk, ...)
-    -- if chunk does not exist, return nothing
-    if not component_manager.components[chunk] then
+function ecs:_get_components(cx, cy, ...)
+    -- if chunk does not exist, return nothing (early exit)
+    local column = component_manager.components[cx]
+    if not column then
         return {}
     end
-
-
+    local chunk = column[cy]
+    if not chunk then
+        return {}
+    end
 
     local comp_types = {...}
 
@@ -36,14 +39,14 @@ function ecs:_get_components(chunk, ...)
     local possible_entities = {}
     for _, comp_type in ipairs(comp_types) do
         local comp_name = comp_type._name
-        local ent_set = component_manager.components[chunk][comp_name]
+        local ent_set = component_manager.components[cx][cy][comp_name]
 
         -- if the given chunk has no entities of the given component <comp_name>, then there can be no entity which has an intersection of the given components. return nothing
         if not ent_set then
             return {}
         end
 
-        table.insert(possible_entities, component_manager.components[chunk][comp_name])
+        table.insert(possible_entities, component_manager.components[cx][cy][comp_name])
     end
 
     -- intersect them
@@ -59,7 +62,7 @@ function ecs:_get_components(chunk, ...)
             table.insert(comp_objects, entity_manager.entities[ent_id][comp_name])
         end
 
-        local entity_data = {ent_id, chunk}
+        local entity_data = {ent_id, cx, cy}
         for _, comp_obj in ipairs(comp_objects) do
             table.insert(entity_data, comp_obj)
         end
@@ -75,26 +78,26 @@ function ecs:get_components(chunks, ...)
     local ret = {}
 
     for _, chunk in ipairs(chunks) do
-        local entity_data = self:_get_components(chunk, commons.unpack(comp_types))
+        local entity_data = self:_get_components(chunk[1], chunk[2], commons.unpack(comp_types))
         commons.extend(ret, entity_data)
     end
 
     return ret
 end
 
-function ecs:delete_entity(ent_id, chunk)
+function ecs:delete_entity(ent_id, cx, cy)
     if not entity_manager.entities[ent_id] then
         return
     end
 
     for comp_type, _ in pairs(entity_manager.entities[ent_id]) do
-        commons.remove_by_key(component_manager.components[chunk][comp_type], ent_id)
+        commons.remove_by_key(component_manager.components[cx][cy][comp_type], ent_id)
     end
 
     entity_manager.entities[ent_id] = nil
 end
 
-function ecs:relocate_entity(ent_id, src_chunk, new_chunk_x, new_chunk_y)
+function ecs:relocate_entity(ent_id, src_chunk_x, src_chunk_y, new_chunk_x, new_chunk_y)
     -- save entity objects
     local comp_objects = {}
     for _, comp_obj in pairs(entity_manager.entities[ent_id]) do
@@ -102,14 +105,13 @@ function ecs:relocate_entity(ent_id, src_chunk, new_chunk_x, new_chunk_y)
     end
 
     -- delete said entity
-    ecs:delete_entity(ent_id, src_chunk)
+    ecs:delete_entity(ent_id, src_chunk_x, src_chunk_y)
 
     -- create new one at new chunk position
-    local new_key = commons.key(new_chunk_x, new_chunk_y)
-    ecs:create_entity(new_key, commons.unpack(comp_objects))
+    ecs:create_entity(new_chunk_x, new_chunk_y, commons.unpack(comp_objects))
 end
 
-function ecs:create_entity(chunk, ...)
+function ecs:create_entity(cx, cy, ...)
     local comp_objects = {...}
 
     local ent_id = entity_manager:get_id()
@@ -118,15 +120,20 @@ function ecs:create_entity(chunk, ...)
     for _, comp_obj in ipairs(comp_objects) do
         local comp_name = comp_obj._name
 
-        if not component_manager.components[chunk] then
-            component_manager.components[chunk] = {}
+        -- make sure the chunk entry exists
+        if not component_manager.components[cx] then
+            component_manager.components[cx] = {}
+        end
+        if not component_manager.components[cx][cy] then
+            component_manager.components[cx][cy] = {}
         end
 
-        if not component_manager.components[chunk][comp_name] then
-            component_manager.components[chunk][comp_name] = {}
+        -- make sure the component name is key of table
+        if not component_manager.components[cx][cy][comp_name] then
+            component_manager.components[cx][cy][comp_name] = {}
         end
 
-        table.insert(component_manager.components[chunk][comp_name], ent_id)
+        table.insert(component_manager.components[cx][cy][comp_name], ent_id)
 
         entity_manager.entities[ent_id][comp_name] = comp_obj
     end

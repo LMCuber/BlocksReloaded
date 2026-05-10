@@ -59,13 +59,8 @@ function _G.bar()
 end
 
 -- useful functions
-function commons.key(cx, cy)
-    return cx .. "," .. cy
-end
-
-function commons.parse_key(key)
-    local cx, cy = key:match("(-?%d+),(-?%d+)")
-    return tonumber(cx), tonumber(cy)
+local function sign(x)
+    return (x > 0 and 1) or (x < 0 and -1) or 0
 end
 
 function commons.round_to(x, step)

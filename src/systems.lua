@@ -10,6 +10,7 @@ local fonts = require("src.fonts")
 local blocks = require("src.blocks")
 local imgui = require("src.libs.imgui")
 local config = require("src.config")
+local joystick = require("src.joystick")
 
 local Button = {
     LEFT = 1,
@@ -20,8 +21,8 @@ local Button = {
 }
 
 local function default_key_data()
-    -- turn all buttons off at start of game (nothing is pressed yet)
-    return {down = false, was_down = false, clicked = false}
+    -- return all off states
+    return {down = false, _was_down = false, clicked = false}
 end
 
 local systems = {
@@ -44,6 +45,7 @@ local systems = {
             [Button.MOUSE_4] = default_key_data(),
             [Button.MOUSE_5] = default_key_data(),
         },
+        joysticks = joystick.joysticks,
         keys = {},
         late_rects = {},
         dead_zone = {0, 0, love.graphics.getWidth(), love.graphics.getHeight()}
@@ -93,7 +95,7 @@ end
 -------------------------------------------------
 ---
 function systems.imgui.process(imgui_area)
-    systems._singletons.dead_zone = imgui_area
+    sg.dead_zone = imgui_area
 
     imgui.begin("Settings", commons.unpack(imgui_area))
 
@@ -107,7 +109,14 @@ function systems.imgui.process(imgui_area)
 
     -- create an imgui checkbox per config item
     for name, _ in pairs(config) do
-        imgui.checkbox(commons.capitalize(name), config, name)
+        if not ({vsync = 0})[name] then
+            imgui.checkbox(commons.capitalize(name), config, name)
+        end
+    end
+
+    -- checkboxes that need execution on click
+    if imgui.checkbox("VSync", config, "vsync") then
+        love.window.setVSync(config.vsync)
     end
 
     imgui.end_()
@@ -118,7 +127,7 @@ function systems.render.process(chunks)
     local num_updated = 0
 
     for _, entry in ipairs(ecs:get_components(chunks, comp.Transform, comp.Sprite)) do
-        local ent_id, chunk, tr, sprite = commons.unpack(entry)
+        local ent_id, cx, cy, tr, sprite = commons.unpack(entry)
 
         local anim_data = anim.get(sprite.anim_skin, sprite.anim_mode)
 
@@ -171,7 +180,7 @@ function systems.render.process(chunks)
                 -- chunk
                 love.graphics.setFont(fonts.orbitron[12])
                 love.graphics.setColor(Color.CYAN)
-                love.graphics.print(chunk, tr.pos.x, tr.pos.y - 60)
+                love.graphics.print(cx .. ", " .. cy, tr.pos.x, tr.pos.y - 60)
 
                 -- image render location rectangle
                 love.graphics.setColor(Color.ORANGE)
@@ -202,7 +211,7 @@ function systems.physics.process(chunks, world)
     local debug_rects = {}
 
     for _, entry in ipairs(ecs:get_components(chunks, comp.Transform, comp.Sprite, comp.Hitbox)) do
-        local _, _, tr, sprite, hitbox = commons.unpack(entry)
+        local _, cx, cy, tr, sprite, hitbox = commons.unpack(entry)
 
         -- initialize dynamic hitbox
         if hitbox.is_dynamic then
@@ -284,7 +293,7 @@ end
 
 function systems.camera.process(chunks)
     for _, entry in ipairs(ecs:get_components(chunks, comp.CameraAnchor, comp.Transform)) do
-        local _, _, cam, tr = commons.unpack(entry)
+        local _, cx, cy, cam, tr = commons.unpack(entry)
 
         sg.fake_scroll.x = sg.fake_scroll.x + (tr.pos.x - sg.fake_scroll.x - WIDTH / 2 + 15) * cam.speed
         sg.fake_scroll.y = sg.fake_scroll.y + (tr.pos.y - sg.fake_scroll.y - HEIGHT / 2 + 15) * cam.speed
@@ -296,11 +305,9 @@ function systems.camera.process(chunks)
 end
 
 function systems.controllable.process(chunks, world)
-    local Intent = comp.Intent
-
     for _, entry in ipairs(ecs:get_components(chunks, comp.Controllable, comp.Sprite, comp.Transform)) do
         -- controlling movement with keyboard
-        local _, _, _, sprite, tr = commons.unpack(entry)
+        local _, _, _, _, sprite, tr = commons.unpack(entry)
 
         if sg.keys["a"].down or sg.keys["d"].down then
             sprite.anim_mode = "run"
@@ -309,16 +316,16 @@ function systems.controllable.process(chunks, world)
             tr.vel.x = 0
         end
 
-        if sg.keys["a"].down then
+        if sg.keys["a"].down or joystick.axes[joystick.map[joystick.current:getName()]["HOR"]] < -joystick.axis_threshold then
             tr.vel.x = -350
             tr.direc = -1
-        elseif sg.keys["d"].down then
+        elseif sg.keys["d"].down or joystick.axes[joystick.map[joystick.current:getName()]["HOR"]] > joystick.axis_threshold then
             tr.vel.x = 350
             tr.direc = 1
         end
 
-        if sg.keys["w"].clicked then
-            tr.vel.y = -740
+        if sg.keys["w"].clicked or joystick.buttons[joystick.map[joystick.current:getName()]["bottom"]]["clicked"] then
+            tr.vel.y = -800
         end
     end
 end
@@ -328,17 +335,16 @@ function systems.editing.process(chunks, world)
 
     -- controllable + inventory means editing (might change later idk)
     for _, entry in ipairs(ecs:get_components(chunks, comp.Inventory, comp.Controllable)) do
-        local _, _, inv, ctrl = commons.unpack(entry)
+        local _, _, _, inv, ctrl = commons.unpack(entry)
 
         -- get the mouse position and current hovering block
         local mx, my = sg.mouse.x, sg.mouse.y
-        local key, block_x, block_y = world:mouse_to_timbre(mx, my, sg.scroll)
-        local current = blocks.name[world:get(key, block_x, block_y)]
+        local cx, cy, rx, ry = world:mouse_to_timbre(mx, my, sg.scroll)
+        local current = blocks.name[world:get(cx, cy, rx, ry)]
 
         -- visual block hover rectanglem
-        local chunk_x, chunk_y = commons.parse_key(key)
-        local rect_x = (chunk_x * CW + block_x - 1) * BS  -- bc 1-based indexing
-        local rect_y = (chunk_y * CH + block_y - 1) * BS
+        local rect_x = (cx * CW + rx - 1) * BS  -- bc 1-based indexing
+        local rect_y = (cy * CH + ry - 1) * BS
         table.insert(sg.late_rects, {rect_x, rect_y, BS, BS, Color.ORANGE})
 
         -- check which action is triggered by clicking mouse
@@ -353,10 +359,10 @@ function systems.editing.process(chunks, world)
         if (sg.buttons[Button.LEFT].down) then
             if ctrl.intent == Intent.PLACE then
                 if current == nil or bwand(current, BF.EMPTY) then
-                    world:place(key, block_x, block_y, inv.items[inv.index])
+                    world:place(cx, cy, rx, ry, inv.items[inv.index])
                 end
             elseif ctrl.intent == Intent.BREAK then
-                world:break_(key, block_x, block_y)
+                world:break_(cx, cy, rx, ry)
             end
         end
     end
@@ -368,11 +374,11 @@ function systems.singletons.process()
     sg.mouse = {x = _x, y = _y}
 
     -- all deadzone-limited buttons
-    if not commons.collidepointmouse(commons.unpack(systems._singletons.dead_zone)) then
+    if not commons.collidepointmouse(commons.unpack(sg.dead_zone)) then
         for button_id, state in pairs(sg.buttons) do
             local is_down = love.mouse.isDown(button_id)  -- e.g. 1 or 3
             state.clicked = is_down and not state.down
-            state.was_down = state.down
+            state._was_down = state.down
             state.down = is_down
         end
     end
@@ -381,7 +387,7 @@ function systems.singletons.process()
     for button_id, state in pairs(sg.raw_buttons) do
         local is_down = love.mouse.isDown(button_id)  -- e.g. 1 or 3
         state.clicked = is_down and not state.down
-        state.was_down = state.down
+        state._was_down = state.down
         state.down = is_down
     end
 
@@ -389,8 +395,21 @@ function systems.singletons.process()
     for key, state in pairs(sg.keys) do
         local is_down = love.keyboard.isDown(key)
         state.clicked = is_down and not state.down
-        state.was_down = state.down
+        state._was_down = state.down
         state.down = is_down
+    end
+
+    -- joystick BUTTON input
+    for btn_id, state in pairs(joystick.buttons) do
+        local is_down = joystick.current:isDown(btn_id)
+        state.clicked = is_down and not state.down
+        state._was_down = state.down
+        state.down = is_down
+    end
+
+    -- joystick AXIS input
+    for axis_id, _ in pairs(joystick.axes) do
+        joystick.axes[axis_id] = joystick.current:getAxis(axis_id)
     end
 end
 
@@ -408,20 +427,19 @@ end
 
 function systems._misc_update.relocate.process(chunks)
     for _, entry in ipairs(ecs:get_components(chunks, comp.Transform)) do
-        local ent_id, chunk, tr = commons.unpack(entry)
+        local ent_id, cx, cy, tr = commons.unpack(entry)
 
-        local chunk_x, chunk_y = commons.parse_key(chunk)
-        local perc_x = ((tr.pos.x / BS) - (chunk_x * CW)) / CW
-        local perc_y = ((tr.pos.y / BS) - (chunk_y * CH)) / CH
+        local perc_x = ((tr.pos.x / BS) - (cx * CW)) / CW
+        local perc_y = ((tr.pos.y / BS) - (cy * CH)) / CH
 
         if perc_x < 0 then
-            ecs:relocate_entity(ent_id, chunk, chunk_x - 1, chunk_y)
+            ecs:relocate_entity(ent_id, cx, cy, cx - 1, cy)
         elseif perc_x >= 1 then
-            ecs:relocate_entity(ent_id, chunk, chunk_x + 1, chunk_y)
+            ecs:relocate_entity(ent_id, cx, cy, cx + 1, cy)
         elseif perc_y < 0 then
-            ecs:relocate_entity(ent_id, chunk, chunk_x, chunk_y - 1)
+            ecs:relocate_entity(ent_id, cx, cy, cx, cy - 1)
         elseif perc_y >= 1 then
-            ecs:relocate_entity(ent_id, chunk, chunk_x, chunk_y + 1)
+            ecs:relocate_entity(ent_id, cx, cy, cx, cy + 1)
         end
     end
 end

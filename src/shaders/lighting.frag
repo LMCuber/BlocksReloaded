@@ -1,22 +1,27 @@
-uniform Image lightTex;
-uniform vec2 texelSize;
-uniform float falloff;
+extern Image LightMap;
+extern vec2 lightMapOffset; // worldTile min_x, min_y
+extern vec2 cameraPos;      // scroll.x / BS, scroll.y / BS
+extern vec2 lightMapSize;   // map_w, map_h
+extern float blockSize;    // Your BS constant (e.g., 32.0)
 
-vec4 effect(vec4 color, Image tex, vec2 uv, vec2 screen_coords) {
-    float current = Texel(lightTex, uv).r;
+vec4 effect(vec4 color, Image texture, vec2 texture_coords, vec2 screen_coords) {
+    // 1. Get the game's color from the Canvas
+    vec4 pixel = Texel(texture, texture_coords);
+
+    // 2. Calculate how many TILES across the screen this pixel is
+    // screen_coords is in pixels (0 to 1920), blockSize is pixels per tile (32)
+    vec2 pixelTileOffset = screen_coords / blockSize;
+
+    // 3. Absolute world tile position
+    vec2 worldTile = cameraPos + pixelTileOffset;
+
+    // 4. Relative position inside the LightMap texture
+    // We subtract the lightMapOffset because the texture starts at min_x, not 0
+    vec2 lightUV = (worldTile - lightMapOffset) / lightMapSize;
+
+    // 5. Sample and multiply
+    vec4 light = Texel(LightMap, lightUV);
     
-    // Sample 4-directional neighbors
-    float up = Texel(lightTex, uv + vec2(0, texelSize.y)).r;
-    float down = Texel(lightTex, uv - vec2(0, texelSize.y)).r;
-    float left = Texel(lightTex, uv - vec2(texelSize.x, 0)).r;
-    float right = Texel(lightTex, uv + vec2(texelSize.x, 0)).r;
-    
-    // Find brightest neighbor
-    float maxNeighbor = max(max(up, down), max(left, right));
-    
-    // Apply falloff and diffuse
-    float diffused = max(0.0, maxNeighbor - falloff);
-    
-    // Keep the brighter value
-    return vec4(max(current, diffused), 0, 0, 1);
+    // We only use the Red channel (where we stored the light)
+    return pixel * vec4(light.r, light.r, light.r, 1.0);
 }

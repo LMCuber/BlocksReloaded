@@ -7,9 +7,10 @@ local ecs = require("src.libs.ecs")
 local comp = require("src.components")
 local systems = require("src.systems")
 local fonts = require("src.fonts")
-local commons = require("src.libs.commons")
 local yaml = require("src.libs.yaml")
 local config = require("src.config")
+local commons = require("src.libs.commons")
+local shaders = require("src.shaders")
 
 -- constants
 local VIEW_PADDING = MAX_LIGHT
@@ -19,12 +20,10 @@ local World = {}
 World.__index = World
 
 --[[
-    key = "1,0" (chunk key)
-    chunk_pos = {1, 0}
-    rel_x, rel_y = 1..CW, 1..CH
-    pitch = (rel_x, rel_y)
-    timbre = (key, pitch)
-    ^^^ this drilla is so smart omg ^^^
+    cw, ch = chunk width, chunk height
+    rx, ry = 1..CW, 1..CH
+    pitch = (rx, ry)
+    timbre = (cw, ch, rx, ry)
 ]]
 function World:new()
     local obj = setmetatable({}, self)
@@ -37,7 +36,8 @@ function World:new()
     obj.light_surf = nil
     -- obj.lighting = true
     obj.lighting = false
-    obj.light_frame = 0
+    obj.light_frames = 1
+    obj.light_frame = obj.light_frames + 1  -- starts at 10 + 1 = 11 so that the first iteration 100% updates light
 
     obj.batch = love.graphics.newSpriteBatch(blocks.sprs, 1000)
     obj.bg_batch = love.graphics.newSpriteBatch(blocks.sprs, 1000)
@@ -72,10 +72,11 @@ function World:load_structures()
 
 end
 
-function World:place_structure(structure, key, x, y)
+function World:place_structure(structure, cx, cy, x, y)
     for _, block_data in ipairs(self.structures[structure]) do
         self:set(
-            key,
+            cx,
+            cy,
             x + block_data[1],
             y + block_data[2],
             block_data[3]
@@ -120,23 +121,27 @@ function World:octave_noise(args)
 end
 
 function World:create_chunk(cx, cy)
-    -- initialize chunk metadata
-    local key = commons.key(cx, cy)
+    -- initialize chunks
     local chunk = {}
     local bg_chunk = {}
-    self.data[key] = chunk
-    self.bg_data[key] = bg_chunk
+    if not self.data[cx] then
+        self.data[cx] = {[cy] = chunk}
+        self.bg_data[cx] = {[cy] = bg_chunk}
+    elseif not self.data[cx][cy] then
+        self.data[cx][cy] = chunk
+        self.bg_data[cx][cy] = bg_chunk
+    end
 
     -- get the biome from noise
     local biome = biomes.Forest
 
-    for rel_x = 1, CW do
+    for rx = 1, CW do
         -- initialize empty column
-        chunk[rel_x] = {}
-        bg_chunk[rel_x] = {}
+        chunk[rx] = {}
+        bg_chunk[rx] = {}
 
         -- get terrain height for this column from noise
-        local block_x = cx * CW + (rel_x - 1)
+        local block_x = cx * CW + (rx - 1)
         local ground_height = math.floor(32 + (self:octave_noise({
             x = block_x,
             y = 1,
@@ -146,13 +151,13 @@ function World:create_chunk(cx, cy)
         local dirt_height = ground_height + 16
         local zero_height = 512
 
-        for rel_y = 1, CH do
+        for ry = 1, CH do
             -- the final data that will be saved
             -- EVERYTHING ABOVE SOIL LEVEL IS AIR BY DEFAULT
             local name = "air"
             local bg_name = "air"
 
-            local block_y = cy * CH + (rel_y - 1)
+            local block_y = cy * CH + (ry - 1)
 
             if block_y >= ground_height then
                 local noise = self:octave_noise({
@@ -188,15 +193,15 @@ function World:create_chunk(cx, cy)
             end
 
             if name ~= nil then
-                self.data[key][rel_x][rel_y] = blocks.id[name]
+                self.data[cx][cy][rx][ry] = blocks.id[name]
             end
             if bg_name ~= nil then
-                self.bg_data[key][rel_x][rel_y] = blocks.id[bg_name]
+                self.bg_data[cx][cy][rx][ry] = blocks.id[bg_name]
             end
         end
     end
 
-    chunk = self:modify_chunk(key)
+    chunk = self:modify_chunk(cx, cy)
 
     return chunk
 end
@@ -212,82 +217,79 @@ function World:get_ore()
     return "stone"
 end
 
-function World:get(key, rel_x, rel_y)
-    if self.data[key] and self.data[key][rel_x] and self.data[key][rel_x][rel_y] then
-        return self.data[key][rel_x][rel_y]
+function World:get(cx, cy, rx, ry)
+    local column = self.data[cx]
+    local chunk = column and column[cy]
+    if not chunk then
+        return nil
     end
-    return nil
+    local rel_column = chunk[rx]
+    return rel_column and rel_column[ry] or nil
 end
 
-function World:set(key, rel_x, rel_y, name, safe, is_bg)
+function World:get_bg(cx, cy, rx, ry)
+    local column = self.bg_data[cx]
+    local chunk = column and column[cy]
+    if not chunk then
+        return nil
+    end
+    local rel_column = chunk[rx]
+    return rel_column and rel_column[ry] or nil
+end
+
+function World:getc(cx, cy)
+    local col = self.data[cx]
+    return col and col[cy] or nil
+end
+
+function World:getc_bg(cx, cy)
+    local col = self.bg_data[cx]
+    return col and col[cy] or nil
+end
+
+function World:set(cx, cy, rx, ry, name, safe, is_bg)
     safe = safe or false  -- safe means doesn't create new chunks if it overflows. Default is false
     is_bg = is_bg or false  -- to change the bg tile instead of the foreground tile. Previously was "|b"
 
-    -- Parse the current chunk key
-    local cx, cy = key:match("(-?%d+),(-?%d+)")
-    cx, cy = tonumber(cx), tonumber(cy)
-
-    local nx, ny = rel_x, rel_y
-    local nkey = key
-
-    -- check horizontal bounds
-    if nx < 1 or nx > CW then
-        if safe then
-            return
-        end
-        -- compute how many chunks we need to move
-        local chunk_offset = math.floor((nx - 1) / CW)
-        cx = cx + chunk_offset
-        -- wrap nx back into 1..CW
-        nx = nx - chunk_offset * CW
+    -- handle Horizontal bleeding
+    if rx < 1 or rx > CW then
+        local offset = math.floor((rx - 1) / CW)
+        cx = cx + offset
+        rx = ((rx - 1) % CW) + 1
     end
 
-    -- check vertical bounds
-    if ny < 1 or ny > CH then
-        if safe then
-            return
-        end
-        -- compute how many chunks we need to move
-        local chunk_offset = math.floor((ny - 1) / CH)
-        cy = cy + chunk_offset
-        -- wrap nx back into 1..CW
-        ny = ny - chunk_offset * CH
+    -- handle Vertical bleeding
+    if ry < 1 or ry > CH then
+        local offset = math.floor((ry - 1) / CH)
+        cy = cy + offset
+        ry = ((ry - 1) % CH) + 1
     end
 
-    -- generate key by concatenating
-    nkey = cx .. "," .. cy
+    local target = is_bg and self.bg_data or self.data
 
-    -- Ensure the tables exist
-    -- local n = 0
-    -- for k, v in pairs(self.data) do
-    --     n = n + 1
-    -- end
-    -- print(n)
-    if not self.data[nkey] then
+    if not target[cx] or not target[cx][cy] then
+        if safe then return end  -- don't potentially cause an infinite loop; just exit early 
         self:create_chunk(cx, cy)
     end
 
-    -- Assign the block
-    if is_bg then
-        self.bg_data[nkey][nx][ny] = blocks.id[name]
-    else
-        self.data[nkey][nx][ny] = blocks.id[name]
-    end
+    target[cx][cy][rx][ry] = blocks.id[name]
 end
 
-function World:modify_chunk(key)
+function World:modify_chunk(cx, cy)
     local function chance(n)
         return love.math.random() <= n
     end
 
-    local chunk_x, chunk_y = commons.parse_key(key)
-    local chunk = self.data[key]
+    local chunk = self:getc(cx, cy)
+    if chunk == nil then
+        return nil
+    end
 
     for x = 1, CW do
         for y = 1, CH do
             local name = blocks.name[chunk[x][y]]
-            local abs_x = chunk_x * CW + x
-            local abs_y = chunk_y * CH + y
+            local abs_x = cx * CW + x
+            local abs_y = cy * CH + y
 
             -- F O R E S T
             if name == "soil_f" then
@@ -302,7 +304,7 @@ function World:modify_chunk(key)
                     else
                         flower = "orchid"
                     end
-                    self:set(key, x, y - 1, flower)
+                    self:set(cx, cy, x, y - 1, flower)
                 end
 
                 -- tree
@@ -310,18 +312,18 @@ function World:modify_chunk(key)
                     local tree_height = love.math.random(4, 16)
                     for yo = 1, tree_height do
                         if yo == tree_height then
-                            self:set(key, x, y - yo, "wood_f_vrLRT")
-                            self:set(key, x, y - yo - 1, "leaf_f")
+                            self:set(cx, cy, x, y - yo, "wood_f_vrLRT")
+                            self:set(cx, cy, x, y - yo - 1, "leaf_f")
                         else
-                            self:set(key, x, y - yo, "wood_f_vrN")
+                            self:set(cx, cy, x, y - yo, "wood_f_vrN")
                         end
 
                         if chance(1 / 4) or yo == tree_height then
-                            self:set(key, x, y - yo, "wood_f_vrR")
-                            self:set(key, x + 1, y - yo, "leaf_f")
+                            self:set(cx, cy, x, y - yo, "wood_f_vrR")
+                            self:set(cx, cy, x + 1, y - yo, "leaf_f")
                         elseif chance(1 / 4) or yo == tree_height then
-                            self:set(key, x, y - yo, "wood_f_vrL")
-                            self:set(key, x - 1, y - yo, "leaf_f")
+                            self:set(cx, cy, x, y - yo, "wood_f_vrL")
+                            self:set(cx, cy, x - 1, y - yo, "leaf_f")
                         end
                     end
                 end
@@ -334,15 +336,15 @@ function World:modify_chunk(key)
                         for xo = -yo, yo do
                             if xo == -yo or xo == yo or yo == pyr_height then
                                 -- borders of the pyramid
-                                self:set(key, x + xo, y - pyr_offset + yo, "sand")
+                                self:set(cx, cy, x + xo, y - pyr_offset + yo, "sand")
                             else
                                 -- inside of the pyramid
-                                self:set(key, x + xo, y - pyr_offset + yo, "air")
-                                self:set(key, x + xo, y - pyr_offset + yo, "sand", false, true)
+                                self:set(cx, cy, x + xo, y - pyr_offset + yo, "air")
+                                self:set(cx, cy, x + xo, y - pyr_offset + yo, "sand", false, true)
                             end
                             -- hidden chest!
                             if yo == pyr_height - 1 and xo == 0 then
-                                self:set(key, x + xo, y - pyr_offset + yo, "chest")
+                                self:set(cx, cy, x + xo, y - pyr_offset + yo, "chest")
                             end
                         end
                     end
@@ -352,7 +354,7 @@ function World:modify_chunk(key)
                 if chance(1 / 120) then
                     for i = 1, 1 do
                         ecs:create_entity(
-                            key,
+                            cx, cy,
                             comp.Transform:new(
                                 Vec2:new(abs_x * BS, (abs_y - 7 - i) * BS),
                                 Vec2:new(0, 0)
@@ -363,10 +365,10 @@ function World:modify_chunk(key)
                     end
                 end
 
-                if chance(1 / 1) then
+                if chance(1 / 100) then
                     for _ = 1, 5 do
                         ecs:create_entity(
-                            key,
+                            cx, cy,
                             comp.Transform:new(
                                 Vec2:new(abs_x * BS, (abs_y - 7) * BS),
                                 Vec2:new(0),
@@ -380,7 +382,7 @@ function World:modify_chunk(key)
 
                 if chance(1 / 1000) then
                     ecs:create_entity(
-                        key,
+                        cx, cy,
                         comp.Transform:new(
                             Vec2:new(abs_x * BS, (abs_y - 3) * BS),
                             Vec2:new(0, 0),
@@ -392,24 +394,24 @@ function World:modify_chunk(key)
                 end
 
                 if chance(1 / 10) then
-                    -- self:set(key, x, y - 3, "dynamite")
-                    self:place_structure("well", key, x, y)
+                    -- self:set(cx, cy, x, y - 3, "dynamite")
+                    self:place_structure("well", cx, cy, x, y)
                 end
             end
 
             -- populate the ore veins (lmao same comment)
             if bwand(name, BF.ORE)
-                    and self:get(key, x + 1, y) ~= nil and nbwand(blocks.name[self:get(key, x + 1, y)], BF.ORE)
-                    and self:get(key, x - 1, y) ~= nil and nbwand(blocks.name[self:get(key, x - 1, y)], BF.ORE)
-                    and self:get(key, x, y + 1) ~= nil and nbwand(blocks.name[self:get(key, x, y + 1)], BF.ORE)
-                    and self:get(key, x, y - 1) ~= nil and nbwand(blocks.name[self:get(key, x, y - 1)], BF.ORE) then
+                    and self:get(cx, cy, x + 1, y) ~= nil and nbwand(blocks.name[self:get(cx, cy, x + 1, y)], BF.ORE)
+                    and self:get(cx, cy, x - 1, y) ~= nil and nbwand(blocks.name[self:get(cx, cy, x - 1, y)], BF.ORE)
+                    and self:get(cx, cy, x, y + 1) ~= nil and nbwand(blocks.name[self:get(cx, cy, x, y + 1)], BF.ORE)
+                    and self:get(cx, cy, x, y - 1) ~= nil and nbwand(blocks.name[self:get(cx, cy, x, y - 1)], BF.ORE) then
 
                 -- simple 2D brownian motion
                 local num_walks = love.math.random(3, 7)
                 local walk_x = x
                 local walk_y = y
                 for _ = 1, num_walks do
-                    self:set(key, walk_x, walk_y, "base-ore", true)
+                    self:set(cx, cy, walk_x, walk_y, "base-ore", true)
                     local r = love.math.random(1, 4)
                     if r == 1 then walk_x = walk_x + 1 end
                     if r == 2 then walk_x = walk_x - 1 end
@@ -423,68 +425,72 @@ function World:modify_chunk(key)
 end
 
 function World:abs_pos_to_chunk(block_x, block_y)
-    local chunk_x = math.floor(block_x / CW)
-    local chunk_y = math.floor(block_y / CH)
-    return Vec2:new(chunk_x, chunk_y)
+    local cx = math.floor(block_x / CW)
+    local cy = math.floor(block_y / CH)
+    return Vec2:new(cx, cy)
 end
 
 function World:abs_pos_to_tile(block_x, block_y, dont_create_if_empty)
-    local chunk_x = math.floor(block_x / CW)
-    local chunk_y = math.floor(block_y / CH)
-    local key = commons.key(chunk_x, chunk_y)
-    local chunk = self.data[key]
+    local cx = math.floor(block_x / CW)
+    local cy = math.floor(block_y / CH)
+    local chunk = self:getc(cx, cy)
     if not chunk and not dont_create_if_empty then
-        chunk = self:create_chunk(chunk_x, chunk_y)
+        chunk = self:create_chunk(cx, cy)
     end
-    local rel_x = (block_x % CW) + 1
-    local rel_y = (block_y % CH) + 1
-    return (chunk[rel_x] and chunk[rel_x][rel_y]) or nil
+    local rx = (block_x % CW) + 1
+    local ry = (block_y % CH) + 1
+    if chunk ~= nil then
+        return (chunk[rx] and chunk[rx][ry]) or nil
+    end
+    return nil
 end
 
 function World:abs_pos_to_bg_tile(block_x, block_y, dont_create_if_empty)
-    local chunk_x = math.floor(block_x / CW)
-    local chunk_y = math.floor(block_y / CH)
-    local key = commons.key(chunk_x, chunk_y)
-    local chunk = self.bg_data[key]
+    local cx = math.floor(block_x / CW)
+    local cy = math.floor(block_y / CH)
+    local chunk = self:getc_bg(cx, cy)
     if not chunk and not dont_create_if_empty then
-        chunk = self:create_chunk(chunk_x, chunk_y)
+        chunk = self:create_chunk(cx, cy)
     end
-    local rel_x = (block_x % CW) + 1
-    local rel_y = (block_y % CH) + 1
-    return (chunk[rel_x] and chunk[rel_x][rel_y]) or nil
+    local rx = (block_x % CW) + 1
+    local ry = (block_y % CH) + 1
+    if chunk ~= nil then
+        return (chunk[rx] and chunk[rx][ry]) or nil
+    end
+    return nil
 end
 
 function World:mouse_to_timbre(mx, my, scroll)
     local block_x = math.floor((mx + scroll.x) / BS)
     local block_y = math.floor((my + scroll.y) / BS)
 
-    local chunk_x = math.floor(block_x / CW)
-    local chunk_y = math.floor(block_y / CH)
+    local cx = math.floor(block_x / CW)
+    local cy = math.floor(block_y / CH)
 
-    local key = commons.key(chunk_x, chunk_y)
+    local rx = (block_x % CW) + 1
+    local ry = (block_y % CH) + 1
 
-    local rel_x = (block_x % CW) + 1
-    local rel_y = (block_y % CH) + 1
-
-    return key, rel_x, rel_y
+    return cx, cy, rx, ry
 end
 
-function World:place(key, block_x, block_y, name)
-    self.data[key][block_x][block_y] = blocks.id[name]
+function World:place(cx, cy, rx, ry, name)
+    self.data[cx][cy][rx][ry] = blocks.id[name]
 end
 
-function World:break_(key, block_x, block_y)
-    local name = blocks.name[self.data[key][block_x][block_y]]
+function World:break_(cx, cy, block_x, block_y)
+    local name = blocks.name[self.data[cx][cy][block_x][block_y]]
     if bwand(name, BF.UNBREAKABLE) then
         return
     end
-    self.data[key][block_x][block_y] = blocks.id["air"]
+    self.data[cx][cy][block_x][block_y] = blocks.id["air"]
 end
 
 function World:update(dt, scroll)
     self:get_processed_chunks(scroll)
     if config.lighting then
+        bench:start(Color.YELLOW)
         self:propagate_lighting(scroll)
+        bench:finish(Color.YELLOW)
     else
         _G.debug_info["light steps"] = "off"
     end
@@ -508,215 +514,248 @@ function World:get_processed_chunks(scroll)  -- side effect: updates self.proces
     local safety = 1
     for y = chunk_topleft.y - safety, chunk_bottomright.y + safety do
         for x = chunk_topleft.x - safety, chunk_bottomright.x + safety do
-            table.insert(self.processed_chunks, commons.key(x, y))
+            table.insert(self.processed_chunks, {x, y})
         end
     end
 end
 
+local qx, qy, ql, qd = {}, {}, {}, {}   -- x, y, light, decay
+
 function World:propagate_lighting(scroll)
     self.light_frame = self.light_frame + 1
-    if self.light_frame < 10 then
+    _G.debug_info["light N"] = self.light_frames
+    if self.light_frame < self.light_frames then
         -- skip frame if it's not the 10th (the higher, the less accurate, but the faster the lighting)
         _G.debug_info["light steps"] = "----"
         return
     end
     self.light_frame = 0
 
-    -- determine bounds
+    -- bounds for light propagation
     local min_x = math.floor(scroll.x / BS) - VIEW_PADDING
     local max_x = math.floor((scroll.x + WIDTH) / BS) + VIEW_PADDING
     local min_y = math.floor(scroll.y / BS) - VIEW_PADDING
     local max_y = math.floor((scroll.y + HEIGHT) / BS) + VIEW_PADDING
 
-    -- reset lightmap
-    self.lightmap = {}
-    for ty = min_y, max_y do
-        self.lightmap[ty] = {}
-    end
-
-    -- BFS queues
-    local qx, qy, ql, qd = {}, {}, {}, {} -- x, y, light, decay
+    -- propagation variables
+    local map_w = max_x - min_x + 1
+    local map_h = max_y - min_y + 1
+    self.lightmap_w = map_w
+    self.lightmap_h = map_h
+    self.lightmap_min_x = min_x
+    self.lightmap_min_y = min_y
+    self.lightmap1d = self.lightmap1d or {}  -- seems to speed up but I don't know why. I assume because some lighting can remain the same?
+    local lightmap = self.lightmap1d
+    local light_data = blocks.light_data
     local head, tail = 1, 0
 
-    -- cache tables
-    local light_data = blocks.light_data
+    -- lightmap data
+    self.light_data = love.image.newImageData(map_w, map_h)
+    self.light_data = love.image.newImageData(map_w, map_h)
+    self.light_tex = love.graphics.newImage(self.light_data)
+    self.light_tex:setFilter("linear", "linear")
 
-    -- init tiles
+    -- initialize lightmap from known light sources
     for ty = min_y, max_y do
+        local y_offset = (ty - min_y) * map_w
         for tx = min_x, max_x do
-            local name    = blocks.name[self:abs_pos_to_tile(tx, ty)]
-            local bg_name = blocks.name[self:abs_pos_to_bg_tile(tx, ty)]
+            local idx = y_offset + (tx - min_x) + 1
 
+            local tile = self:abs_pos_to_tile(tx, ty, true)
+            local bg_tile = self:abs_pos_to_bg_tile(tx, ty, true)
+
+            local name = blocks.name[tile]
+            local bg_name = blocks.name[bg_tile]
             local ld = light_data[name]
 
             if (name == "air" and bg_name == "air") or (name ~= "air" and bwand(name, BF.LIGHT_SOURCE)) then
-                local lv    = ld and ld.strength or MAX_LIGHT
-                local decay = ld and ld.decay or 1
+                local lv = ld and ld.strength or MAX_LIGHT
+                -- Decay of 1 is standard for "spreading"
+                local d = ld and ld.decay or 1
 
-                self.lightmap[ty][tx] = lv
+                lightmap[idx] = lv
                 tail = tail + 1
-                qx[tail], qy[tail], ql[tail], qd[tail] = tx, ty, lv, decay
+                qx[tail], qy[tail], ql[tail], qd[tail] = tx, ty, lv, d
             else
-                self.lightmap[ty][tx] = 0
+                lightmap[idx] = 0
             end
         end
     end
 
-    -- setup variables
-    local offsets = {
-        {1, 0}, {-1, 0},
-        {0, 1}, {0, -1},
-    }
-
     -- BFS propagation
     local steps = 0
     while head <= tail do
-        local x  = qx[head]
-        local y  = qy[head]
-        local lv = ql[head]
-        local d  = qd[head]
+        local x, y, lv, d = qx[head], qy[head], ql[head], qd[head]
         head = head + 1
 
+        -- the light level for the NEXT block
         local next_lv = lv - d
-        if next_lv <= 0 then
-            goto continue
-        end
 
-        for i = 1, 4 do
-            local off = offsets[i]
-            local nx, ny = x + off[1], y + off[2]
-            local row = self.lightmap[ny]
+        if next_lv > 0 then
+            for i = 1, 4 do
+                local nx, ny
+                if i == 1 then nx, ny = x + 1, y
+                elseif i == 2 then nx, ny = x - 1, y
+                elseif i == 3 then nx, ny = x, y + 1
+                else nx, ny = x, y - 1 end
 
-            if row then
-                local cur = row[nx]
-                if cur ~= nil then
-                    local pass_lv = next_lv
-                    if pass_lv > cur then
-                        row[nx] = pass_lv
+                if nx >= min_x and nx <= max_x and ny >= min_y and ny <= max_y then
+                    local n_idx = (ny - min_y) * map_w + (nx - min_x) + 1
+                    local cur = lightmap[n_idx] or 0
+
+                    -- only spread if the new light is brighter than this current light
+                    if next_lv > cur then
+                        lightmap[n_idx] = next_lv
                         tail = tail + 1
-                        qx[tail], qy[tail], ql[tail], qd[tail] = nx, ny, pass_lv, d
+                        qx[tail], qy[tail], ql[tail], qd[tail] = nx, ny, next_lv, d
                         steps = steps + 1
                     end
                 end
             end
         end
-
-        ::continue::
     end
+
+    -- put lightmap1d -> light_data
+    for i = 1, #lightmap do
+        local lx = (i - 1) % map_w
+        local ly = math.floor((i - 1) / map_w)
+        -- LIGHT IS STORED IN THE RED CHANNEL!
+        if lx < map_w and ly < map_h then
+            local val = lightmap[i] / MAX_LIGHT
+            self.light_data:setPixel(lx, ly, val, 0, 0, 1)
+        end
+    end
+    self.light_tex:replacePixels(self.light_data)
 
     _G.debug_info["light steps"] = steps
 end
 
+function World:prepare_lighting_shader(scroll)
+    if not (config.lighting and self.light_tex) then return end
+
+    local shader = shaders.lighting
+    -- send all the tile-space arguments to the shader
+    shader:send("LightMap", self.light_tex)
+    shader:send("lightMapOffset", {self.lightmap_min_x, self.lightmap_min_y})
+    shader:send("cameraPos", {scroll.x / BS, scroll.y / BS})
+    shader:send("lightMapSize", {self.lightmap_w, self.lightmap_h})
+    shader:send("blockSize", BS)
+end
+
 function World:draw(scroll)
-    -- bench:start(Color.LIME)
-
-    -- B L O C K S
-    local min_x = math.floor(scroll.x / BS)
-    local max_x = math.floor((scroll.x + WIDTH) / BS)
-    local min_y = math.floor(scroll.y / BS)
-    local max_y = math.floor((scroll.y + HEIGHT) / BS)
-    local size_x = max_x - min_x + 1
-    local size_y = max_y - min_y + 1
-    local lighting_offset = Vec2:new(0, 0)
-
-    -- clear the image batch and light surface
-    self.batch:clear()
-    self.bg_batch:clear()
-    if config.lighting then
-        self.light_surf = love.image.newImageData(size_x, size_y)
-    end
-    local prints = {}
+    local num_rendered_entities = 0
+    local num_updated_entities = 0
     local num_rendered_tiles = 0
+    local min_x, min_y, max_x, max_y = 0, 0, 0, 0
 
-    for ty = min_y, max_y do
-        for tx = min_x, max_x do
-            -- get the (bg) tile and (bg) name of the block given absolute coordinates
-            local tile = self:abs_pos_to_tile(tx, ty)
-            local bg_tile = self:abs_pos_to_bg_tile(tx, ty)
-            local name = blocks.name[tile]
-            local bg_name = blocks.name[bg_tile]
+    if config.blocks then
+        bench:start(Color.GREEN)
 
-            -- get light value
-            local light = (self.lightmap[ty] and self.lightmap[ty][tx]) or 0
-            local norm_light = light / MAX_LIGHT
+        -- B L O C K S
+        min_x = math.floor(scroll.x / BS)
+        max_x = math.floor((scroll.x + WIDTH) / BS)
+        min_y = math.floor(scroll.y / BS)
+        max_y = math.floor((scroll.y + HEIGHT) / BS)
+        local size_x = max_x - min_x + 1
+        local size_y = max_y - min_y + 1
+        local lighting_offset = Vec2:new(0, 0)
 
-            -- goto continue
+        -- clear the image batch and light surface
+        self.batch:clear()
+        self.bg_batch:clear()
+        if config.lighting then
+            self.light_surf = love.image.newImageData(size_x, size_y)
+        end
 
-            -- if there is foreground, draw that. Else, if background, draw that
-            if tile ~= nil and name ~= "air" then
-                self.batch:add(blocks.quads[tile], tx * BS, ty * BS, 0, S, S)
-                num_rendered_tiles = num_rendered_tiles + 1
-            end
-            if bg_tile ~= nil and bg_name ~= "air" then
-                self.bg_batch:add(blocks.quads[bg_tile], tx * BS, ty * BS, 0, S, S)
-                num_rendered_tiles = num_rendered_tiles + 1
-            end
-            num_rendered_tiles = num_rendered_tiles + 1
+        local lw = self.lightmap_w
+        local lx = self.lightmap_min_x
+        local ly = self.lightmap_min_y
+        for ty = min_y, max_y do
+            local y_offset = (ty - ly) * lw
+            local screen_y = ty * BS
 
-            -- only overlay block with darkness if the block itself is not a light source
-            if config.lighting then
-                if nbwand(name, BF.LIGHT_SOURCE) or (name == "air" and bg_name ~= "air") then
-                        self.light_surf:setPixel(
-                        tx - min_x, ty - min_y,
-                        0, 0, 0, 1 - norm_light
-                    )
+            for tx = min_x, max_x do
+                -- get the (bg) tile and (bg) name of the block given absolute coordinates
+                local tile = self:abs_pos_to_tile(tx, ty)
+                local bg_tile = self:abs_pos_to_bg_tile(tx, ty)
+                local name = blocks.name[tile]
+                local bg_name = blocks.name[bg_tile]
+
+                -- lightmap index for this block
+                local idx = y_offset + (tx - lx) + 1
+
+                -- get light value
+                local light = self.lightmap1d[idx] or 0
+                local norm_light = light / MAX_LIGHT
+
+                -- goto continue
+
+                -- if there is foreground, draw that. Else, if background, draw that
+                if tile ~= nil and name ~= "air" then
+                    self.batch:add(blocks.quads[tile], tx * BS, screen_y, 0, S, S)
+                    num_rendered_tiles = num_rendered_tiles + 1
                 end
-                table.insert(prints, {light or 0, tx * BS, ty * BS})
+
+                -- skip drawing the background tile IFF the foreground tile is solid (has no holes)
+                if nbwand(name, BF.SOLID) and bg_tile ~= nil and bg_name ~= "air" then
+                    self.bg_batch:add(blocks.quads[bg_tile], tx * BS, screen_y, 0, S, S)
+                    num_rendered_tiles = num_rendered_tiles + 1
+                end
+
+                -- only overlay block with darkness if the block itself is not a light source
+                -- if config.lighting then
+                --     if nbwand(name, BF.LIGHT_SOURCE) or (name == "air" and bg_name ~= "air") then
+                --             self.light_surf:setPixel(
+                --             tx - min_x, ty - min_y,
+                --             0, 0, 0, 1 - norm_light
+                --         )
+                --     end
+                --     table.insert(prints, {light or 0, tx * BS, screen_y})
+                -- end
+
+                -- calculate the lighting offset
+                if tx == min_x and ty == min_y then
+                    lighting_offset.x = tx * BS - scroll.x
+                    lighting_offset.y = screen_y - scroll.y
+                end
+
+                love.graphics.setColor(Color.WHITE)
             end
-
-            -- calculate the lighting offset
-            if tx == min_x and ty == min_y then
-                lighting_offset.x = tx * BS - scroll.x
-                lighting_offset.y = ty * BS - scroll.y
-            end
-
-            love.graphics.setColor(Color.WHITE)
         end
-    end
 
-    -- B L O C K  L I G H T I N G
+        -- B L O C K  L I G H T I N G
 
-    --[[
-    render steps:
-        - background tiles
-        - foreground tiles
-        - player
-        - lighting overlay
-    --]]
+        --[[
+        render steps:
+            - background tiles
+            - foreground tiles
+            - player
+            - lighting overlay
+        --]]
 
-    local bg_light_mult = 0.5
-    love.graphics.setColor(bg_light_mult, bg_light_mult, bg_light_mult, 1)
-    love.graphics.draw(self.bg_batch)
-    love.graphics.setColor(Color.WHITE)
-    love.graphics.draw(self.batch)
+        local bg_light_mult = 0.5
+        love.graphics.setColor(bg_light_mult, bg_light_mult, bg_light_mult, 1)
+        love.graphics.draw(self.bg_batch)
+        love.graphics.setColor(Color.WHITE)
+        love.graphics.draw(self.batch)
 
-    -- render the entities (render here so they work with the lightings)
-    bench:start(Color.NAVY)
-    local num_rendered_entities, num_updated_entities = systems.render.process(self.processed_chunks)
-    bench:finish(Color.NAVY)
-
-    -- render chunk border rectangles (visual)
-    if config.borders then
-        for _, chunk_key in ipairs(self.processed_chunks) do
-            love.graphics.setColor(Color.CYAN)
-            local chunk_x, chunk_y = commons.parse_key(chunk_key)
-            chunk_x = chunk_x * CW * BS
-            chunk_y = chunk_y * CH * BS
-            love.graphics.rectangle("line", chunk_x, chunk_y, CW * BS, CH * BS)
-            love.graphics.setFont(fonts.orbitron[20])
-            love.graphics.print(chunk_key, chunk_x + CW * BS / 2, chunk_y + CH * BS / 2)
+        -- render the entities (render here so they work with the lightings)
+        if config.rendering then
+            bench:start(Color.CYAN)
+            num_rendered_entities, num_updated_entities = systems.render.process(self.processed_chunks)
+            bench:finish(Color.CYAN)
         end
+
+        -- render the lightmap
+        if config.lighting then
+            self.light_surf = love.graphics.newImage(self.light_surf)
+            -- self.light_surf:setFilter("nearest", "nearest")
+            love.graphics.draw(self.light_surf, scroll.x + lighting_offset.x, scroll.y + lighting_offset.y, 0, BS, BS)
+        end
+        love.graphics.setColor(Color.WHITE)
+
+        bench:finish(Color.GREEN)
     end
-
-    if config.lighting then
-        self.light_surf = love.graphics.newImage(self.light_surf)
-        -- self.light_surf:setFilter("nearest", "nearest")
-        love.graphics.draw(self.light_surf, scroll.x + lighting_offset.x, scroll.y + lighting_offset.y, 0, BS, BS)
-    end
-
-    love.graphics.setColor(Color.WHITE)
-
-    -- bench:finish(Color.LIME)
 
     _G.debug_info["R. entities"] = num_rendered_entities
     _G.debug_info["U. entities"] = num_updated_entities

@@ -107,7 +107,9 @@ function imgui.checkbox(text, config, attr)
     local is_pressed = love.mouse.isDown(1)
     if is_col and is_pressed and not state.was_pressed then
         config[attr] = not config[attr]
+        return true
     end
+    return false
 end
 
 return imgui
