@@ -6,23 +6,23 @@ local entity_manager = {
     entities = {},
 }
 
-function entity_manager:get_id()
-    self.counter = self.counter + 1
-    return self.counter - 1
+function entity_manager.get_id()
+    entity_manager.counter = entity_manager.counter + 1
+    return entity_manager.counter - 1
 end
 
 local component_manager = {
-    cache = {},  -- TODO: cache
+    cache = {},  -- TODO. cache
     components = {},
 }
 
-local ecs = {}
+local ecs = {singletons = {}}
 
-function ecs:try_component(ent_id, comp_type)
+function ecs.try_component(ent_id, comp_type)
     return entity_manager.entities[ent_id][comp_type._name]
 end
 
-function ecs:_get_components(cx, cy, ...)
+function ecs._get_components(cx, cy, ...)
     -- if chunk does not exist, return nothing (early exit)
     local column = component_manager.components[cx]
     if not column then
@@ -73,19 +73,19 @@ function ecs:_get_components(cx, cy, ...)
 
 end
 
-function ecs:get_components(chunks, ...)
+function ecs.get_components(chunks, ...)
     local comp_types = {...}
     local ret = {}
 
     for _, chunk in ipairs(chunks) do
-        local entity_data = self:_get_components(chunk[1], chunk[2], commons.unpack(comp_types))
+        local entity_data = ecs._get_components(chunk[1], chunk[2], commons.unpack(comp_types))
         commons.extend(ret, entity_data)
     end
 
     return ret
 end
 
-function ecs:delete_entity(ent_id, cx, cy)
+function ecs.delete_entity(ent_id, cx, cy)
     if not entity_manager.entities[ent_id] then
         return
     end
@@ -97,7 +97,7 @@ function ecs:delete_entity(ent_id, cx, cy)
     entity_manager.entities[ent_id] = nil
 end
 
-function ecs:relocate_entity(ent_id, src_chunk_x, src_chunk_y, new_chunk_x, new_chunk_y)
+function ecs.relocate_entity(ent_id, src_chunk_x, src_chunk_y, new_chunk_x, new_chunk_y)
     -- save entity objects
     local comp_objects = {}
     for _, comp_obj in pairs(entity_manager.entities[ent_id]) do
@@ -105,16 +105,16 @@ function ecs:relocate_entity(ent_id, src_chunk_x, src_chunk_y, new_chunk_x, new_
     end
 
     -- delete said entity
-    ecs:delete_entity(ent_id, src_chunk_x, src_chunk_y)
+    ecs.delete_entity(ent_id, src_chunk_x, src_chunk_y)
 
     -- create new one at new chunk position
-    ecs:create_entity(new_chunk_x, new_chunk_y, commons.unpack(comp_objects))
+    ecs.create_entity(new_chunk_x, new_chunk_y, commons.unpack(comp_objects))
 end
 
-function ecs:create_entity(cx, cy, ...)
+function ecs.create_entity(cx, cy, ...)
     local comp_objects = {...}
 
-    local ent_id = entity_manager:get_id()
+    local ent_id = entity_manager.get_id()
     entity_manager.entities[ent_id] = {}
 
     for _, comp_obj in ipairs(comp_objects) do

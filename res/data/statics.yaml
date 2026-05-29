@@ -1,4 +1,8 @@
 # S T A T I C  E N T I T I E S -----------------------------------------------------------------
+DEFAULT:
+    speed: 0.088
+    offset: 0
+    
 portal:
     idle:
         frames: 7

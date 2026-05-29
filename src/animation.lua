@@ -12,17 +12,23 @@ for _, entity_type in ipairs(entity_types) do
 
     -- safety for the LSP
     if type(yaml_data) ~= "table" then
-        goto continue
+        goto skip_this_ent_type
     end
 
+    assert(yaml_data["DEFAULT"] ~= nil, "entity type '" .. entity_type .. "' must have a DEFAULT field")
+
     for skin, _ in pairs(yaml_data) do
+        if skin == "DEFAULT" then
+            goto continue
+        end
+
         anim.data[skin] = {}
 
         for mode, _ in pairs(yaml_data[skin]) do
             anim.data[skin][mode] = {}
             anim.data[skin][mode]["frames"] = yaml_data[skin][mode]["frames"]
-            anim.data[skin][mode]["speed"] = yaml_data[skin][mode]["speed"] or 11
-            anim.data[skin][mode]["offset"] = yaml_data[skin][mode]["offset"]
+            anim.data[skin][mode]["speed"] = yaml_data[skin][mode]["speed"] or yaml_data["DEFAULT"]["speed"]
+            anim.data[skin][mode]["offset"] = yaml_data[skin][mode]["offset"] or yaml_data["DEFAULT"]["offset"]
 
             anim.data[skin][mode]["sprs"] = love.graphics.newImage(string.format(
                 "res/images/%s/%s/%s.png",
@@ -45,12 +51,21 @@ for _, entity_type in ipairs(entity_types) do
                 )
             end
         end
+
+        ::continue::
     end
 
-    ::continue::
+    ::skip_this_ent_type::
 end
 
 function anim.get(skin, mode)
+    -- crazy error handling
+    if anim.data[skin] == nil then
+        error(string.format("Skin type \"%s\" doesn't exist (with mode \"%s\")", skin, mode))
+    elseif anim.data[skin][mode] == nil then
+        error(string.format("Mode \"%s\" doesn't exist (for skin type %s)", mode, skin))
+    end
+
     local anim_data = anim.data[skin][mode]
     return {
         sprs = anim_data["sprs"],

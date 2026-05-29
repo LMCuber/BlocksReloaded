@@ -21,18 +21,18 @@ _G.debug_info = {}
 
 ---------------------------------------------------------------------
 
-ecs:create_entity(
+ecs.create_entity(
     0, 0,
     comp.Transform:new(
         Vec2:new(400, 400),
         Vec2:new(0, 0),
         1.2
     ),
-    comp.Sprite:from_path("res/images/player_animations/nutcracker/run.png"),
+    comp.Sprite:from_path("res/images/player_animations/dexter/run.png"),
     comp.Hitbox:new(52, 80),  -- static hitbox
     comp.CameraAnchor:new(0.04),  -- camera follows its position
     comp.Controllable:new(),  -- can move using keyboard,
-    comp.Inventory:new({"torch", "torch", "supertorch"})  -- inventory to place blocks
+    comp.Inventory:new({"stone", "torch", "supertorch"})  -- inventory to place blocks
 )
 
 local processed_chunks = {}
@@ -129,9 +129,7 @@ function love.draw()
     end
 
     -- a batch of rectangles sent by the systems to render at once
-    if config.hitboxes then
-        systems.late_rects.process()
-    end
+    systems.late_rects.process()
     systems.process_misc_draw_systems(processed_chunks)
 
     -- EXIT: OFFSETTED RENDERING. EVERYHING FROM HERE WILL BE RENDERED ABSOLUTELY

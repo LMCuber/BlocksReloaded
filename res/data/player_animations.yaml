@@ -1,14 +1,18 @@
 # P L A Y E R  A N I M A T I O N S ------------------------------------------------------------
-# DEFAULT:
-#     speed: 0.088
+DEFAULT:
+    speed: 14
+    offset: 0
 
 dexter:
     idle:
         frames: 4
         offset: 3
+        speed: 4
     run:
         frames: 4
         offset: 3
+    jump:
+        frames: 1
 
 nutcracker:
     idle:

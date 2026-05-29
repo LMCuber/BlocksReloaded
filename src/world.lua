@@ -120,7 +120,7 @@ function World:octave_noise(args)
     return final_value
 end
 
-function World:create_chunk(cx, cy)
+function World:generate_chunk(cx, cy)
     -- initialize chunks
     local chunk = {}
     local bg_chunk = {}
@@ -167,7 +167,6 @@ function World:create_chunk(cx, cy)
                     pers = 0.5,
                     lac = 2,
                     octaves = 3,
-                    -- worm = false,
                     worm = true,
                 })
 
@@ -179,10 +178,9 @@ function World:create_chunk(cx, cy)
                     end
                     bg_name = biome.dirt
 
-
                 elseif block_y <= zero_height then
                     -- cave
-                    if noise < 0.7 then
+                    if not (noise > 0.7) then
                         name = self:get_ore()
                     end
                     bg_name = "stone"
@@ -192,6 +190,7 @@ function World:create_chunk(cx, cy)
                 end
             end
 
+            -- finalize the data
             if name ~= nil then
                 self.data[cx][cy][rx][ry] = blocks.id[name]
             end
@@ -249,16 +248,16 @@ end
 
 function World:set(cx, cy, rx, ry, name, safe, is_bg)
     safe = safe or false  -- safe means doesn't create new chunks if it overflows. Default is false
-    is_bg = is_bg or false  -- to change the bg tile instead of the foreground tile. Previously was "|b"
+    is_bg = is_bg or false  -- to change the bg tile instead of the foreground tile.
 
-    -- handle Horizontal bleeding
+    -- handle horizontal bleeding
     if rx < 1 or rx > CW then
         local offset = math.floor((rx - 1) / CW)
         cx = cx + offset
         rx = ((rx - 1) % CW) + 1
     end
 
-    -- handle Vertical bleeding
+    -- handle vertical bleeding
     if ry < 1 or ry > CH then
         local offset = math.floor((ry - 1) / CH)
         cy = cy + offset
@@ -269,7 +268,7 @@ function World:set(cx, cy, rx, ry, name, safe, is_bg)
 
     if not target[cx] or not target[cx][cy] then
         if safe then return end  -- don't potentially cause an infinite loop; just exit early 
-        self:create_chunk(cx, cy)
+        self:generate_chunk(cx, cy)
     end
 
     target[cx][cy][rx][ry] = blocks.id[name]
@@ -308,23 +307,61 @@ function World:modify_chunk(cx, cy)
                 end
 
                 -- tree
-                if chance(1 / 15) then
+                if chance(1 / 45) then
                     local tree_height = love.math.random(4, 16)
                     for yo = 1, tree_height do
                         if yo == tree_height then
+                            -- top tree block is triple (left-right-top)
                             self:set(cx, cy, x, y - yo, "wood_f_vrLRT")
                             self:set(cx, cy, x, y - yo - 1, "leaf_f")
-                        else
-                            self:set(cx, cy, x, y - yo, "wood_f_vrN")
-                        end
-
-                        if chance(1 / 4) or yo == tree_height then
-                            self:set(cx, cy, x, y - yo, "wood_f_vrR")
-                            self:set(cx, cy, x + 1, y - yo, "leaf_f")
-                        elseif chance(1 / 4) or yo == tree_height then
-                            self:set(cx, cy, x, y - yo, "wood_f_vrL")
                             self:set(cx, cy, x - 1, y - yo, "leaf_f")
+                            self:set(cx, cy, x + 1, y - yo, "leaf_f")
+                        else
+                            -- otherwise, have a probability of having a branch
+                            if chance(1 / 4) then
+                                self:set(cx, cy, x, y - yo, "wood_f_vrR")
+                                self:set(cx, cy, x + 1, y - yo, "leaf_f")
+                            elseif chance(1 / 4) then
+                                self:set(cx, cy, x, y - yo, "wood_f_vrL")
+                                self:set(cx, cy, x - 1, y - yo, "leaf_f")
+                            else
+                                self:set(cx, cy, x, y - yo, "wood_f_vrN")
+                            end
                         end
+                    end
+                end
+
+                -- other tree
+                if chance(1 / 45) then
+                    local tree_height = love.math.random(4, 16)
+                    for yo = 1, tree_height do
+                        if yo == tree_height then
+                            -- top tree block is triple (left-right-top)
+                            self:set(cx, cy, x, y - yo, "wood_p_vrN")
+                            self:set(cx, cy, x, y - yo - 1, "leaf_f")
+                            self:set(cx, cy, x - 1, y - yo, "leaf_f")
+                            self:set(cx, cy, x + 1, y - yo, "leaf_f")
+                        else
+                            -- otherwise, have a probability of having a branch
+                            if chance(1 / 4) then
+                                self:set(cx, cy, x, y - yo, "wood_p_vrR")
+                                self:set(cx, cy, x + 1, y - yo, "leaf_f")
+                            elseif chance(1 / 4) then
+                                self:set(cx, cy, x, y - yo, "wood_p_vrL")
+                                self:set(cx, cy, x - 1, y - yo, "leaf_f")
+                            else
+                                self:set(cx, cy, x, y - yo, "wood_p_vrN")
+                            end
+                        end
+                    end
+                end
+
+                -- pillar
+                if chance(1 / 25) then
+                    local tree_height = love.math.random(4, 16)
+                    for yo = 1, tree_height do
+                        local pillar_index = love.math.random(0, 3)
+                        self:set(cx, cy, x, y - yo, "pillar_vr" .. pillar_index)
                     end
                 end
 
@@ -351,9 +388,9 @@ function World:modify_chunk(cx, cy)
                 end
 
                 -- entities
-                if chance(1 / 120) then
+                if chance(1 / 20) then
                     for i = 1, 1 do
-                        ecs:create_entity(
+                        ecs.create_entity(
                             cx, cy,
                             comp.Transform:new(
                                 Vec2:new(abs_x * BS, (abs_y - 7 - i) * BS),
@@ -365,13 +402,13 @@ function World:modify_chunk(cx, cy)
                     end
                 end
 
-                if chance(1 / 100) then
+                if chance(1 / 1000000) then
                     for _ = 1, 5 do
-                        ecs:create_entity(
+                        ecs.create_entity(
                             cx, cy,
                             comp.Transform:new(
                                 Vec2:new(abs_x * BS, (abs_y - 7) * BS),
-                                Vec2:new(0),
+                                Vec2:new(100),
                                 1
                             ),
                             comp.Sprite:from_path("res/images/mobs/chicken/walk.png"),
@@ -381,7 +418,7 @@ function World:modify_chunk(cx, cy)
                 end
 
                 if chance(1 / 1000) then
-                    ecs:create_entity(
+                    ecs.create_entity(
                         cx, cy,
                         comp.Transform:new(
                             Vec2:new(abs_x * BS, (abs_y - 3) * BS),
@@ -435,7 +472,7 @@ function World:abs_pos_to_tile(block_x, block_y, dont_create_if_empty)
     local cy = math.floor(block_y / CH)
     local chunk = self:getc(cx, cy)
     if not chunk and not dont_create_if_empty then
-        chunk = self:create_chunk(cx, cy)
+        chunk = self:generate_chunk(cx, cy)
     end
     local rx = (block_x % CW) + 1
     local ry = (block_y % CH) + 1
@@ -450,7 +487,7 @@ function World:abs_pos_to_bg_tile(block_x, block_y, dont_create_if_empty)
     local cy = math.floor(block_y / CH)
     local chunk = self:getc_bg(cx, cy)
     if not chunk and not dont_create_if_empty then
-        chunk = self:create_chunk(cx, cy)
+        chunk = self:generate_chunk(cx, cy)
     end
     local rx = (block_x % CW) + 1
     local ry = (block_y % CH) + 1
@@ -493,6 +530,7 @@ function World:update(dt, scroll)
         bench:finish(Color.YELLOW)
     else
         _G.debug_info["light steps"] = "off"
+    _G.debug_info["light N"] = "-"
     end
     return self.processed_chunks
 end

@@ -1,7 +1,7 @@
 local commons = {}
 
 -- globals (use sparingly, we do not want to pollute the global namespace)
-_G.GRAVITY = 2600
+_G.GRAVITY = 2800
 _G.WIDTH, _G.HEIGHT = love.graphics.getDimensions()
 
 function _G.test(...)
@@ -59,10 +59,6 @@ function _G.bar()
 end
 
 -- useful functions
-local function sign(x)
-    return (x > 0 and 1) or (x < 0 and -1) or 0
-end
-
 function commons.round_to(x, step)
     return math.floor(x / step + 0.5) * step
 end

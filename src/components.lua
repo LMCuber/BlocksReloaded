@@ -31,6 +31,11 @@ function comp.Controllable:new()
     return setmetatable({
         mouse_held = false,
         intent = comp.Intent.NONE,
+        grounded = false,
+        jump_buffered = nil,
+        jump_buffer = 0.15,  -- in SECONDS
+        coyote_timer = nil,
+        coyote_time = 0.1,  -- in SECONDS
     }, self)
 end
 
@@ -65,10 +70,6 @@ function comp.Transform:new(pos, vel, gravity, sines, rot, rot_vel)
     obj.rot = rot or 0
     obj.rot_vel = rot_vel or 0
 
-    obj.def_vel = vel:copy()
-    obj.last_tile = nil
-    obj.last_blocks_around = nil
-
     if obj.sines.x ~= 0 or obj.sines.y ~= 0 then
         obj.sine_offsets = Vec2:new(
             love.math.random() * 2 * math.pi,
@@ -85,13 +86,21 @@ comp.Sprite = {}
 comp.Sprite.__index = comp.Sprite
 comp.Sprite._name = "Sprite"
 
-function comp.Sprite:from_path(path)
+function comp.Sprite:from_path(path, has_anim)
     local obj = setmetatable({}, self)
 
     obj.path = path
     obj.anim_skin, obj.anim_mode = path:match(".*/(.-)/(.-)%.png$")
     obj.img = love.graphics.newImage(path)
+    obj.img:setFilter("nearest", "nearest")
+
     obj.anim = 1
+
+    if has_anim == nil then
+        obj.has_anim = true
+    else
+        obj.has_anim = has_anim
+    end
 
     return obj
 end

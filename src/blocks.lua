@@ -50,6 +50,11 @@ for name, flag in pairs(flags) do
     end
 end
 
+-- automatically set flags for list of blocks
+for i = 0, 3 do
+    flags["pillar_vr" .. i] = BF.WALKABLE
+end
+
 -- lighting data
 _G.MAX_LIGHT = 15
 local light_data = {
