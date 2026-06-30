@@ -15,6 +15,26 @@ function _G.iprint(tbl)
 end
 
 -- LLM code
+function commons.atan2(y, x)
+    if x > 0 then
+        return math.atan(y / x)
+    elseif x < 0 then
+        if y >= 0 then
+            return math.atan(y / x) + math.pi
+        else
+            return math.atan(y / x) - math.pi
+        end
+    else -- x == 0
+        if y > 0 then
+            return math.pi / 2
+        elseif y < 0 then
+            return -math.pi / 2
+        else
+            return 0 -- undefined mathematically, but standard atan2 usually returns 0
+        end
+    end
+end
+
 function _G.pprint(value, indent, visited)
     indent = indent or 0
     visited = visited or {}

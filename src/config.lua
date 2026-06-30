@@ -1,7 +1,7 @@
 local config = {
     hitboxes = false,
     borders = false,
-    shaders = false,
+    shaders = true,
     lighting = true,
     physics = true,
     rendering = true,

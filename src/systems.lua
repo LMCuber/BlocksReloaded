@@ -54,6 +54,7 @@ local systems = {
     -- update step systems
     _misc_update = {
         relocate = {},
+        timer = {}
     },
     singletons = {},
     physics = {},
@@ -93,7 +94,17 @@ function systems.process_misc_draw_systems(chunks)
 end
 
 -------------------------------------------------
----
+
+function systems._misc_update.timer.process(chunks)
+    for _, entry in ipairs(ecs.get_components(chunks, comp.Timer)) do
+        local ent_id, cx, cy, tim = commons.unpack(entry)
+
+        if love.timer.getTime() - tim.last >= tim.duration then
+            ecs.delete_entity(ent_id, cx, cy)
+        end
+    end
+end
+
 function systems.imgui.process(imgui_area)
     sg.dead_zone = imgui_area
 
@@ -439,23 +450,34 @@ function systems.editing.process(chunks, world)
         -- RIGHT MOUSE TESTING
         if sg.buttons[Button.RIGHT].clicked then
             local tr = ecs.try_component(ent_id, comp.Transform)
+            local hitbox = ecs.try_component(ent_id, comp.Hitbox)
+
             -- mouse_(x/y) are the in-game coordinates of the mouse
             local mouse_x = mx + sg.scroll.x
             local mouse_y = my + sg.scroll.y
-            local angle = math.atan2(mouse_y - tr.pos.y, mouse_x - tr.pos.x)
-            local m = 1000
-            local xvel = math.cos(angle) * m
-            local yvel = math.sin(angle) * m
-            ecs.create_entity(
-                cx, cy,
-                comp.Transform:new(
-                    Vec2:new(tr.pos.x, tr.pos.y),
-                    Vec2:new(xvel, yvel),
-                    1.2
-                ),
-                comp.Sprite:from_path("res/images/bullet.png", false),
-                comp.Hitbox:new(12, 12)
-            )
+
+            local dy = mouse_y - tr.pos.y
+            local dx = mouse_x - tr.pos.x
+
+            local angle_range = math.pi / 3
+            for ao = -10, 10 do
+                local angle = commons.atan2(dy, dx) + (ao / 20 * angle_range)
+                local m = 1000
+                local xvel = math.cos(angle) * m
+                local yvel = math.sin(angle) * m
+
+                ecs.create_entity(
+                    cx, cy,
+                    comp.Transform:new(
+                        Vec2:new(tr.pos.x + hitbox.w / 2 - 6, tr.pos.y + hitbox.h / 2 - 6),
+                        Vec2:new(xvel, yvel),
+                        0.2
+                    ),
+                    comp.Sprite:from_path("res/images/bullet.png", false),
+                    comp.Hitbox:new(12, 12),
+                    comp.Timer:new(1)
+                )
+            end
         end
 
         if (sg.buttons[Button.LEFT].down) then

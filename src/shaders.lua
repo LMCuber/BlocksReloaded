@@ -8,5 +8,6 @@ end
 load_shader("src/shaders/default.frag", "default")
 load_shader("src/shaders/lighting.frag", "lighting")
 load_shader("src/shaders/sky.frag", "sky")
+load_shader("src/shaders/palette.frag", "palette")
 
 return shaders

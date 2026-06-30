@@ -138,4 +138,17 @@ end
 
 -------------------------------------------------
 
+comp.Timer = {}
+comp.Timer.__index = comp.Timer
+comp.Timer._name = "Timer"
+
+function comp.Timer:new(duration)
+    return setmetatable({
+        last = love.timer.getTime(),
+        duration = duration
+    }, self)
+end
+
+----------------------------------------------------
+
 return comp

@@ -13,6 +13,7 @@ local math = require("math")
 local Color = require("src.color")
 local commons = require("src.libs.commons")
 local fonts = require("src.fonts")
+local palettes = require("src.palettes")
 
 ---------------------------------------------------------------------
 
@@ -32,7 +33,7 @@ ecs.create_entity(
     comp.Hitbox:new(52, 80),  -- static hitbox
     comp.CameraAnchor:new(0.04),  -- camera follows its position
     comp.Controllable:new(),  -- can move using keyboard,
-    comp.Inventory:new({"stone", "torch", "supertorch"})  -- inventory to place blocks
+    comp.Inventory:new({"torch", "torch", "supertorch"})  -- inventory to place blocks
 )
 
 local processed_chunks = {}
@@ -87,9 +88,10 @@ function love.update(dt)
     systems.process_misc_update_systems(processed_chunks)
 
     -- shaders
-    shaders.sky:send("time", love.timer.getTime())
-    shaders.default:send("time", love.timer.getTime())
-    shaders.default:send("levels", 16);
+    -- shaders.sky:send("time", love.timer.getTime())
+    -- shaders.default:send("time", love.timer.getTime())
+    -- shaders.default:send("levels", 16);
+    palettes:send(shaders.palette, "neon_flesh")
 end
 
 ---------------------------------------------------------------------
@@ -99,18 +101,18 @@ function love.draw()
     love.graphics.setCanvas(CANVAS)
 
     -- reset the shader of the last frame
-    love.graphics.setShader()
+    love.graphics.setShader(nil)
 
     -- background
-    if config.shaders then
-        love.graphics.setShader(shaders.sky)
-    end
     love.graphics.setColor({0.14, 0.12, 0.24})
     love.graphics.rectangle("fill", 0, 0, WIDTH, HEIGHT)
-    love.graphics.setShader()
 
     -- ENTER: RENDERING WITH CAMERA SCROLL OFFSET
     love.graphics.push()
+
+    if config.shaders then
+        love.graphics.setShader(shaders.palette)
+    end
 
     systems.camera.process(processed_chunks)
     world:draw(systems._singletons.scroll)
@@ -127,7 +129,13 @@ function love.draw()
             love.graphics.print(cx .. ", " .. cy, blit_x + CW * BS / 2, blit_y + CH * BS / 2)
         end
     end
+    love.graphics.setShader(nil)
 
+    -- a batch of rectangles sent by the systems to render at once
+    systems.late_rects.process()
+    systems.process_misc_draw_systems(processed_chunks)
+
+    -- EXIT: OFFSETTED RENDERING. EVERYHING 
     -- a batch of rectangles sent by the systems to render at once
     systems.late_rects.process()
     systems.process_misc_draw_systems(processed_chunks)
@@ -136,15 +144,15 @@ function love.draw()
     love.graphics.pop()
 
     -- BLITTING CANVAS ONTO MAIN WINDOW
-    love.graphics.setCanvas()
+    love.graphics.setCanvas(nil)
     -- apply lighting shader beforehand
     love.graphics.setColor(Color.WHITE)
     if config.lighting and world.light_tex then
         world:prepare_lighting_shader(systems._singletons.scroll)  -- sends data to shader including: light texture, offsets
         love.graphics.setShader(shaders.lighting)
     end
-    love.graphics.draw(CANVAS, 0, 0)
-    love.graphics.setShader()
+    love.graphics.draw(CANVAS, 0, 0)  -- blit canvas onto main window
+    love.graphics.setShader(nil)  -- identity shader
 
     -- POST-CANVAS
     bench:draw()
