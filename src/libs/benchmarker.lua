@@ -9,7 +9,7 @@ function Benchmarker:new(width)
     local obj = {
         width = width or 100,
         freq = 0.5,
-        times = {},
+        times = {},  -- name (key) -> {time, color}
         prev_times = nil,
         last_update = love.timer.getTime(),
     }
@@ -17,14 +17,14 @@ function Benchmarker:new(width)
     return obj
 end
 
-function Benchmarker:start(key)
-    self.times[key] = love.timer.getTime()
+function Benchmarker:start(key, color)
+    self.times[key] = {time = love.timer.getTime(), color = color}
 end
 
 function Benchmarker:finish(key, p)
-    self.times[key] = love.timer.getTime() - self.times[key]
+    self.times[key].time = love.timer.getTime() - self.times[key].time
     if p then
-        print(math.floor(self.times[key] * 1000) .. " / " .. 1 / love.timer.getFPS() * 1000 .. " ms")
+        print(math.floor(self.times[key].time * 1000) .. " / " .. 1 / love.timer.getFPS() * 1000 .. " ms")
     end
 end
 
@@ -40,17 +40,27 @@ function Benchmarker:draw()
         times = self.prev_times
     end
 
-    for _, time in pairs(times) do
-        sum = sum + time
+    for _, payload in pairs(times) do
+        sum = sum + payload.time
     end
 
     local xo = 180
     local m = 1
-    for key, time in pairs(times) do
+    for key, payload in pairs(times) do
+        local time, color = payload.time, payload.color
+
         local w = time / sum * self.width
-        love.graphics.setColor(key)
+        love.graphics.setColor(color)
         love.graphics.setFont(fonts.orbitron[12])
         love.graphics.rectangle("fill", xo + total_w, 46, w, 20)
+
+        if commons.collidepointmouse(xo + total_w, 46, w, 20) then
+            love.graphics.setColor(Color.WHITE)
+            local x, y = love.mouse.getPosition()
+            love.graphics.setFont(fonts.orbitron[14])
+            love.graphics.print(key, x - 20, y + 40)
+        end
+
         total_w = total_w + w
         love.graphics.setColor(Color.WHITE)
 
@@ -61,6 +71,8 @@ function Benchmarker:draw()
     end
     love.graphics.setColor(Color.BLACK)
     love.graphics.rectangle("line", xo, 46, self.width, 20)
+
+    love.graphics.setColor(Color.WHITE)
 
     self.times = {}
 end

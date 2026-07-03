@@ -48,7 +48,7 @@ local systems = {
         },
         keys = {},
         late_rects = {},
-        dead_zone = {0, 0, love.graphics.getWidth(), love.graphics.getHeight()}
+        dead_zone = nil
     },
 
     -- update step systems
@@ -387,10 +387,10 @@ function systems.controllable.process(chunks, world)
         end
 
         if sg.keys["a"].down or joystick.axis_left("HOR") then
-            tr.vel.x = -350
+            tr.vel.x = -310
             tr.direc = -1
         elseif sg.keys["d"].down or joystick.axis_right("HOR") then
-            tr.vel.x = 350
+            tr.vel.x = 310
             tr.direc = 1
         end
 
@@ -498,7 +498,7 @@ function systems.singletons.process()
     sg.mouse = {x = _x, y = _y}
 
     -- all deadzone-limited buttons
-    if not commons.collidepointmouse(commons.unpack(sg.dead_zone)) then
+    if sg.dead_zone == nil or not commons.collidepointmouse(commons.unpack(sg.dead_zone)) then
         for button_id, state in pairs(sg.buttons) do
             local is_down = love.mouse.isDown(button_id)  -- e.g. 1 or 3
             state.clicked = is_down and not state.down

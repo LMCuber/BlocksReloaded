@@ -79,6 +79,18 @@ function _G.bar()
 end
 
 -- useful functions
+function _G.with(canvas, shader, code, setup)
+    if setup ~= nil then setup() end
+
+    love.graphics.setCanvas(canvas)
+    love.graphics.setShader(shader)
+
+    if code ~= nil then code() end
+
+    love.graphics.setCanvas(nil)
+    love.graphics.setShader(nil)
+end
+
 function commons.round_to(x, step)
     return math.floor(x / step + 0.5) * step
 end

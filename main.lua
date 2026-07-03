@@ -60,9 +60,12 @@ end
 
 function love.load()
     _G.CANVAS = love.graphics.newCanvas(love.graphics.getWidth(), love.graphics.getHeight())
+    _G.LIGHTING_CANVAS = love.graphics.newCanvas(love.graphics.getWidth(), love.graphics.getHeight())
     local icon = love.image.newImageData("res/images/visuals/windows_icon.png")
     love.window.setIcon(icon)
     love.window.setVSync(config.vsync)
+
+    palettes:send(shaders.palette, "twilight")
 end
 
 -------
@@ -78,9 +81,9 @@ function love.update(dt)
 
     -- other systems that don't just take processed_chunks as argument
     if config.physics then
-        bench:start(Color.LIGHT_GRAY)
+        bench:start("physics", Color.LIGHT_GRAY)
         systems.physics.process(processed_chunks, world)
-        bench:finish(Color.LIGHT_GRAY, false)
+        bench:finish("physics", false)
     end
 
     systems.editing.process(processed_chunks, world)
@@ -91,14 +94,13 @@ function love.update(dt)
     -- shaders.sky:send("time", love.timer.getTime())
     -- shaders.default:send("time", love.timer.getTime())
     -- shaders.default:send("levels", 16);
-    palettes:send(shaders.palette, "neon_flesh")
 end
 
 ---------------------------------------------------------------------
 
 function love.draw()
     -- DRAW EVERYHING ON AUXILIARY CANVAS
-    love.graphics.setCanvas(CANVAS)
+    love.graphics.setCanvas(LIGHTING_CANVAS)
 
     -- reset the shader of the last frame
     love.graphics.setShader(nil)
@@ -109,10 +111,6 @@ function love.draw()
 
     -- ENTER: RENDERING WITH CAMERA SCROLL OFFSET
     love.graphics.push()
-
-    if config.shaders then
-        love.graphics.setShader(shaders.palette)
-    end
 
     systems.camera.process(processed_chunks)
     world:draw(systems._singletons.scroll)
@@ -129,7 +127,8 @@ function love.draw()
             love.graphics.print(cx .. ", " .. cy, blit_x + CW * BS / 2, blit_y + CH * BS / 2)
         end
     end
-    love.graphics.setShader(nil)
+    -- -- EXIT: PALETTE SHADER
+    -- love.graphics.setShader(nil)
 
     -- a batch of rectangles sent by the systems to render at once
     systems.late_rects.process()
@@ -143,19 +142,30 @@ function love.draw()
     -- EXIT: OFFSETTED RENDERING. EVERYHING FROM HERE WILL BE RENDERED ABSOLUTELY
     love.graphics.pop()
 
-    -- BLITTING CANVAS ONTO MAIN WINDOW
-    love.graphics.setCanvas(nil)
-    -- apply lighting shader beforehand
-    love.graphics.setColor(Color.WHITE)
-    if config.lighting and world.light_tex then
-        world:prepare_lighting_shader(systems._singletons.scroll)  -- sends data to shader including: light texture, offsets
-        love.graphics.setShader(shaders.lighting)
-    end
-    love.graphics.draw(CANVAS, 0, 0)  -- blit canvas onto main window
-    love.graphics.setShader(nil)  -- identity shader
+    -- lightmap onto canvas (and when doing that, apply the lighting)
+    with(
+        CANVAS, config.lighting and shaders.lighting or nil,
+        function ()
+            love.graphics.draw(LIGHTING_CANVAS, 0, 0)
+        end,
+        function()
+            world:prepare_lighting_shader(systems._singletons.scroll)  -- sends data to shader including: light texture, offsets
+        end
+    )
 
-    -- POST-CANVAS
+    -- final stretch
+    with(nil, config.shaders and shaders.palette or nil,
+        function()
+            bench:start("palette", Color.PURPLE)
+            love.graphics.draw(CANVAS, 0, 0)
+            bench:finish("palette")
+        end
+    )
+
+    -- UI
+    love.graphics.setCanvas(nil)
     bench:draw()
     systems.imgui.process({0, 0, 160, HEIGHT})
-    love.graphics.setColor(Color.WHITE)
+
+    assert(love.graphics.getCanvas() == nil, "the final blit must be onto the global canvas")
 end

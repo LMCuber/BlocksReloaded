@@ -525,9 +525,9 @@ end
 function World:update(dt, scroll)
     self:get_processed_chunks(scroll)
     if config.lighting then
-        bench:start(Color.YELLOW)
+        bench:start("lighting", Color.YELLOW)
         self:propagate_lighting(scroll)
-        bench:finish(Color.YELLOW)
+        bench:finish("lighting")
     else
         _G.debug_info["light steps"] = "off"
     _G.debug_info["light N"] = "-"
@@ -669,8 +669,6 @@ function World:propagate_lighting(scroll)
 end
 
 function World:prepare_lighting_shader(scroll)
-    if not (config.lighting and self.light_tex) then return end
-
     local shader = shaders.lighting
     -- send all the tile-space arguments to the shader
     shader:send("LightMap", self.light_tex)
@@ -687,7 +685,7 @@ function World:draw(scroll)
     local min_x, min_y, max_x, max_y = 0, 0, 0, 0
 
     if config.blocks then
-        bench:start(Color.GREEN)
+        bench:start("blocks", Color.GREEN)
 
         -- B L O C K S
         min_x = math.floor(scroll.x / BS)
@@ -779,9 +777,9 @@ function World:draw(scroll)
 
         -- render the entities (render here so they work with the lightings)
         if config.rendering then
-            bench:start(Color.CYAN)
+            bench:start("entities", Color.CYAN)
             num_rendered_entities, num_updated_entities = systems.render.process(self.processed_chunks)
-            bench:finish(Color.CYAN)
+            bench:finish("entities")
         end
 
         -- render the lightmap
@@ -792,7 +790,7 @@ function World:draw(scroll)
         end
         love.graphics.setColor(Color.WHITE)
 
-        bench:finish(Color.GREEN)
+        bench:finish("blocks")
     end
 
     _G.debug_info["R. entities"] = num_rendered_entities
