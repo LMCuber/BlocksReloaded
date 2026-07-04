@@ -59,13 +59,11 @@ function love.load()
     palettes:send(shaders.palette, "2000")
 end
 
-local o = 0.17 * math.pi
 local model = Model:new({
-    obj_path = "res/models/cube.obj",
-    size = 140,
-    light = {0, -1, 0},
-    angle = Vec3:new(o, o, 0),
-    avel = Vec3:new(0.0, 0.7, 0),
+    obj_path = "res/models/battle_axe.obj",
+    ortho_size = 2,
+    angle = Vec3:new(0, 0, 0),
+    avel = Vec3:new(0.7, 0.7, 0.7),
     points = Color.NAVY,
 })
 
@@ -85,18 +83,11 @@ function love.update(dt)
         bench:finish("physics", false)
     end
 
-    -- bench:start("asdd", Color.PINK)
     model:update(dt)
-    -- bench:finish("asdd")
 
     systems.editing.process(processed_chunks, world)
     systems.controllable.process(processed_chunks, world)
     systems.process_misc_update_systems(processed_chunks)
-
-    -- shaders
-    -- shaders.sky:send("time", love.timer.getTime())
-    -- shaders.default:send("time", love.timer.getTime())
-    -- shaders.default:send("levels", 16);
 end
 
 ---------------------------------------------------------------------
@@ -165,23 +156,23 @@ function love.draw()
     )
 
     -- =================================================================
-    -- 3D MODEL RENDERING
+    -- 3D MODEL RENDERING ONTO DEEP_CANVAS -> MAIN WINDOW
     -- =================================================================
-    -- Render into a canvas with an attached depth buffer.
     love.graphics.setCanvas({DEEP_CANVAS, depth = true})
+    love.graphics.setShader(shaders.model)
     love.graphics.clear(true, true, true)
     love.graphics.setDepthMode("lequal", true)
 
-    love.graphics.setShader(shaders.model)
-    
-    -- Send matrices transposed so Love2D maps them correctly to the GLSL uniforms
-    shaders.model:send("u_model", mmath.mat4_transpose(model.model))
-    shaders.model:send("u_view",  mmath.mat4_transpose(model.view))
-    shaders.model:send("u_proj",  mmath.mat4_transpose(model.proj))
+    shaders.model:send("uModel", mmath.mat4_transpose(model.model))
+    shaders.model:send("uView",  mmath.mat4_transpose(model.view))
+    shaders.model:send("uProj",  mmath.mat4_transpose(model.proj))
 
+    bench:start("3d", Color.PINK)
     love.graphics.draw(model.mesh)
-    love.graphics.setShader()
+    bench:finish("3d")
 
+    -- model -> main window
+    love.graphics.setShader()
     love.graphics.setDepthMode()
     love.graphics.setCanvas(nil)
     love.graphics.draw(DEEP_CANVAS, 0, 0)

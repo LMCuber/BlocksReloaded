@@ -31,6 +31,19 @@ function mmath.mat4_perspective(fovy, aspect, near, far)
     return m
 end
 
+function mmath.mat4_ortho(left, right, bottom, top, near, far)
+    local rl = right - left
+    local tb = top - bottom
+    local fn = far - near
+
+    return {
+        2 / rl,          0,               0,               0,
+        0,               2 / tb,          0,               0,
+        0,               0,              -2 / fn,          0,
+        -(right+left)/rl, -(top+bottom)/tb, -(far+near)/fn,  1
+    }
+end
+
 function mmath.vec3_sub(a, b) return {a[1]-b[1], a[2]-b[2], a[3]-b[3]} end
 function mmath.vec3_cross(a, b)
     return {

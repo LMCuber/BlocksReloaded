@@ -159,11 +159,9 @@ end
 function commons.split(str, sep)
     local result = {}
     local pattern = "([^" .. sep .. "]+)"
-    
     for match in string.gmatch(str, pattern) do
         table.insert(result, match)
     end
-    
     return result
 end
 
