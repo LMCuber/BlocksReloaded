@@ -5,28 +5,28 @@ local commons = require("src.libs.commons")
 local imgui = {}
 local state = {
     -- defaults
-    padding = 8,
+    padding = {x = 8, y = 2},
     -- rest
-    cursor_x = 0,
-    cursor_y = 0,
+    cursor = {x = 0, y = 0},
     width = 0,
     height = 0,
     was_pressed = false,
     font = nil,
     font_size = 16,
+    bg_color = Color.DARK_GRAY
 }
 
 -- LIFETIME
 
 function imgui.begin(window_name, cursor_x, cursor_y, width, height)
     -- setup
-    state.cursor_x = cursor_x
-    state.cursor_y = cursor_y + state.padding
+    state.cursor.x = cursor_x
+    state.cursor.y = cursor_y + state.padding.x
     state.width = width
     state.height = height
     -- bg
     love.graphics.setColor{0.1, 0.1, 0.1, 0.8}
-    love.graphics.rectangle("fill", state.cursor_x, state.cursor_y, width, height)
+    love.graphics.rectangle("fill", state.cursor.x, state.cursor.y, width, height)
 end
 
 function imgui.end_()
@@ -45,11 +45,73 @@ end
 
 -- WIDGETS
 
-function imgui.hbar()
-    local h = 20
+function imgui.combo(options, config, attr)
+    local w, h = state.width, 24
+    -- arrow width and height
+    local ah = h - 6
+    local aw = 18
+    local ao = (h - ah) / 2  -- distance between arrow and top border of widget
+
+    -- bg
+    love.graphics.setColor(state.bg_color)
+    love.graphics.rectangle("fill", state.cursor.x, state.cursor.y, w, h)
+
+    -- left arrow
+    local left_arrow = {state.cursor.x + state.padding.x, state.cursor.y + ao, aw, ah}
+    local is_col_left = commons.collidepointmouse(commons.unpack(left_arrow))
+    love.graphics.setColor(Color.NAVY)
+    if is_col_left then
+        love.graphics.setColor(Color.LIGHT_NAVY)
+    end
+    love.graphics.rectangle("fill", commons.unpack(left_arrow))
+    love.graphics.setColor(Color.YELLOW)
+    love.graphics.polygon("fill",
+        left_arrow[1] + aw / 4, left_arrow[2] + ah / 2,
+        left_arrow[1] + aw * (3 / 4), left_arrow[2],
+        left_arrow[1] + aw * (3 / 4), left_arrow[2] + ah
+    )
+
+    -- text
+    local index = config[attr]
+    love.graphics.print(options[index], state.cursor.x + state.padding.x + aw + state.padding.x, state.cursor.y)
+
+    -- right arrow
+    local right_arrow = {state.cursor.x + w - aw - state.padding.x, state.cursor.y + ao, aw, ah}
+    local is_col_right = commons.collidepointmouse(commons.unpack(right_arrow))
+    love.graphics.setColor(Color.NAVY)
+    if is_col_right then
+        love.graphics.setColor(Color.LIGHT_NAVY)
+    end
+    love.graphics.rectangle("fill", commons.unpack(right_arrow))
     love.graphics.setColor(Color.WHITE)
-    love.graphics.line(state.cursor_x + 2, state.cursor_y + h / 2, state.cursor_x + state.width - 2, state.cursor_y + h / 2)
-    state.cursor_y = state.cursor_y + h
+    love.graphics.setColor(Color.YELLOW)
+    love.graphics.polygon("fill",
+        right_arrow[1] + aw * (3 / 4), right_arrow[2] + ah / 2,
+        right_arrow[1] + aw / 4, right_arrow[2],
+        right_arrow[1] + aw / 4, right_arrow[2] + ah
+    )
+
+    -- cleanup
+    state.cursor.y = state.cursor.y + h + state.padding.y
+
+    -- return value
+    local is_pressed = love.mouse.isDown(1)
+    if is_pressed and not state.was_pressed then
+        if is_col_left then
+            config[attr] = math.max(config[attr] - 1, 1)
+        elseif is_col_right then
+            config[attr] = math.min(config[attr] + 1, #options)
+        end
+        return true
+    end
+    return false
+end
+
+function imgui.hbar()
+    local h = 30
+    love.graphics.setColor(Color.WHITE)
+    love.graphics.line(state.cursor.x, state.cursor.y + h / 2, state.width, state.cursor.y + h / 2)
+    state.cursor.y = state.cursor.y + h + state.padding.y
 end
 
 function imgui.label(text)
@@ -61,22 +123,22 @@ function imgui.label(text)
 
     love.graphics.setColor(Color.WHITE)
     love.graphics.setFont(state.font[state.font_size])
-    love.graphics.print(text, state.cursor_x + state.padding, state.cursor_y)
-    state.cursor_y = state.cursor_y + h
+    love.graphics.print(text, state.cursor.x + state.padding.x, state.cursor.y)
+    state.cursor.y = state.cursor.y + h + state.padding.y
 end
 
 function imgui.checkbox(text, config, attr)
     -- locals
-    local w, h = 120, 24
+    local w, h = state.width, 24
     local cw = h - 6  -- cw is the checkbox width
-    local co = (h - cw) / 2  -- dist between checkbox and left side of text
+    local co = (h - cw) / 2
 
     -- bg
-    love.graphics.setColor(Color.DARK_GRAY)
-    love.graphics.rectangle("fill", state.cursor_x, state.cursor_y, w, h)
+    love.graphics.setColor(state.bg_color)
+    love.graphics.rectangle("fill", state.cursor.x, state.cursor.y, w, h)
 
     -- checkbox
-    local checkbox = {state.cursor_x + state.padding, state.cursor_y + co, cw, cw}
+    local checkbox = {state.cursor.x + state.padding.x, state.cursor.y + co, cw, cw}
     local is_col = commons.collidepointmouse(commons.unpack(checkbox))
     love.graphics.setColor(Color.NAVY)
     if is_col then
@@ -98,10 +160,10 @@ function imgui.checkbox(text, config, attr)
     -- text
     love.graphics.setColor(Color.WHITE)
     love.graphics.setFont(fonts.orbitron[state.font_size])
-    love.graphics.print(text, state.cursor_x + cw + state.padding * 2, state.cursor_y)
+    love.graphics.print(text, state.cursor.x + state.padding.x + cw + state.padding.x, state.cursor.y)
 
     -- advance cursor
-    state.cursor_y = state.cursor_y + h
+    state.cursor.y = state.cursor.y + h + state.padding.y
 
     -- return if it is pressed
     local is_pressed = love.mouse.isDown(1)

@@ -166,11 +166,21 @@ function Model:load_obj()
             local vert_count = 0
             for i, vert_data in ipairs(args) do
                 if i > 1 then
-                    -- get corresponding vertex position, normal, etc.
-                    local data = commons.split(vert_data, "/")
-                    local vert_index = tonumber(data[1])
+                    -- parse the face data
+                    local data, vert_index, normal
+                    if string.find(vert_data, "//") then
+                        -- no texture data, just vertex//normal
+                        data = commons.split(vert_data, "//")
+                        vert_index = tonumber(data[1])
+                        normal = normals[tonumber(data[2])]
+                    else
+                        -- vertex/texture uv/normal
+                        data = commons.split(vert_data, "/")
+                        vert_index = tonumber(data[1])
+                        normal = normals[tonumber(data[3])]
+                    end
                     local vertex_pos = unique_vertices[vert_index]
-                    local normal = normals[tonumber(data[3])]
+
                     -- create a new vertex with correct index and correct color for this specific face
                     local vertex = {
                         vertex_pos[1], vertex_pos[2], vertex_pos[3],

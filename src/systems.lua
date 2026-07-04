@@ -10,6 +10,8 @@ local fonts = require("src.fonts")
 local blocks = require("src.blocks")
 local imgui = require("src.libs.imgui")
 local config = require("src.config")
+local palettes = require("src.palettes")
+local shaders = require("src.shaders")
 
 local Button = {
     LEFT = 1,
@@ -128,6 +130,11 @@ function systems.imgui.process(imgui_area)
     -- checkboxes that need execution on click
     if imgui.checkbox("VSync", config, "vsync") then
         love.window.setVSync(config.vsync)
+    end
+
+    -- options
+    if imgui.combo(palettes.list, config, "palette_index") then
+        palettes:send(shaders.palette, palettes.list[config.palette_index])
     end
 
     imgui.end_()

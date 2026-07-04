@@ -7,6 +7,7 @@ local config = {
     entities = true,
     blocks = true,
     vsync = true,
+    palette_index = 1
 }
 
 return config

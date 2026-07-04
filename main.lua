@@ -56,12 +56,12 @@ function love.load()
     love.window.setIcon(icon)
     love.window.setVSync(config.vsync)
 
-    palettes:send(shaders.palette, "2000")
+    palettes:send(shaders.palette, "pancakes")
 end
 
 local model = Model:new({
-    obj_path = "res/models/battle_axe.obj",
-    ortho_size = 2,
+    obj_path = "res/models/katana.obj",
+    ortho_size = 6,
     angle = Vec3:new(0, 0, 0),
     avel = Vec3:new(0.7, 0.7, 0.7),
     points = Color.NAVY,
