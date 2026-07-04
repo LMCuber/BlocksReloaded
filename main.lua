@@ -14,6 +14,7 @@ local Color = require("src.color")
 local commons = require("src.libs.commons")
 local fonts = require("src.fonts")
 local palettes = require("src.palettes")
+local mmath = require("src.libs.mmath")
 
 ---------------------------------------------------------------------
 
@@ -38,17 +39,6 @@ ecs.create_entity(
 
 local processed_chunks = {}
 
-local o = 0.17 * math.pi
-local model = Model:new({
-    obj_path = "res/models/bcc.obj",
-    center = Vec2:new(500, 300),
-    size = 140,
-    light = {0, -1, 0},
-    angle = Vec3:new(o, o, 0),
-    avel = Vec3:new(0.0, 0.7, 0),
-    points = Color.NAVY,
-})
-
 ---------------------------------------------------------------------
 
 function love.keypressed(key)
@@ -59,16 +49,25 @@ function love.keypressed(key)
 end
 
 function love.load()
-    _G.CANVAS = love.graphics.newCanvas(love.graphics.getWidth(), love.graphics.getHeight())
-    _G.LIGHTING_CANVAS = love.graphics.newCanvas(love.graphics.getWidth(), love.graphics.getHeight())
+    _G.CANVAS = love.graphics.newCanvas(love.graphics.getWidth(), love.graphics.getHeight())  -- penultimate canvas before blitting onto main window
+    _G.DEEP_CANVAS = love.graphics.newCanvas(love.graphics.getWidth(), love.graphics.getHeight())  -- canvas to be used with a depth field
+    _G.LIGHTING_CANVAS = love.graphics.newCanvas(love.graphics.getWidth(), love.graphics.getHeight())  -- when this canvas gets blitted onto next canvas, indermediately: lighting happens
     local icon = love.image.newImageData("res/images/visuals/windows_icon.png")
     love.window.setIcon(icon)
     love.window.setVSync(config.vsync)
 
-    palettes:send(shaders.palette, "twilight")
+    palettes:send(shaders.palette, "2000")
 end
 
--------
+local o = 0.17 * math.pi
+local model = Model:new({
+    obj_path = "res/models/cube.obj",
+    size = 140,
+    light = {0, -1, 0},
+    angle = Vec3:new(o, o, 0),
+    avel = Vec3:new(0.0, 0.7, 0),
+    points = Color.NAVY,
+})
 
 function love.update(dt)
     _G.debug_info = {}
@@ -86,6 +85,10 @@ function love.update(dt)
         bench:finish("physics", false)
     end
 
+    -- bench:start("asdd", Color.PINK)
+    model:update(dt)
+    -- bench:finish("asdd")
+
     systems.editing.process(processed_chunks, world)
     systems.controllable.process(processed_chunks, world)
     systems.process_misc_update_systems(processed_chunks)
@@ -99,17 +102,17 @@ end
 ---------------------------------------------------------------------
 
 function love.draw()
-    -- DRAW EVERYHING ON AUXILIARY CANVAS
+    -- =================================================================
+    -- SETUP
+    -- =================================================================
     love.graphics.setCanvas(LIGHTING_CANVAS)
-
-    -- reset the shader of the last frame
     love.graphics.setShader(nil)
-
-    -- background
     love.graphics.setColor({0.14, 0.12, 0.24})
     love.graphics.rectangle("fill", 0, 0, WIDTH, HEIGHT)
 
-    -- ENTER: RENDERING WITH CAMERA SCROLL OFFSET
+    -- =================================================================
+    -- 2D CAMERA STARTED!
+    -- =================================================================
     love.graphics.push()
 
     systems.camera.process(processed_chunks)
@@ -127,22 +130,19 @@ function love.draw()
             love.graphics.print(cx .. ", " .. cy, blit_x + CW * BS / 2, blit_y + CH * BS / 2)
         end
     end
-    -- -- EXIT: PALETTE SHADER
-    -- love.graphics.setShader(nil)
 
     -- a batch of rectangles sent by the systems to render at once
     systems.late_rects.process()
     systems.process_misc_draw_systems(processed_chunks)
 
-    -- EXIT: OFFSETTED RENDERING. EVERYHING 
-    -- a batch of rectangles sent by the systems to render at once
-    systems.late_rects.process()
-    systems.process_misc_draw_systems(processed_chunks)
-
-    -- EXIT: OFFSETTED RENDERING. EVERYHING FROM HERE WILL BE RENDERED ABSOLUTELY
+    -- =================================================================
+    -- 2D CAMERA ENDS HERE!
+    -- =================================================================
     love.graphics.pop()
 
-    -- lightmap onto canvas (and when doing that, apply the lighting)
+    -- =================================================================
+    -- LIGHTMAP RENDERING -> CANVAS
+    -- =================================================================
     with(
         CANVAS, config.lighting and shaders.lighting or nil,
         function ()
@@ -153,7 +153,9 @@ function love.draw()
         end
     )
 
-    -- final stretch
+    -- =================================================================
+    -- POST-PROCESSED CANVAS RENDERING -> MAIN WINDOW
+    -- =================================================================
     with(nil, config.shaders and shaders.palette or nil,
         function()
             bench:start("palette", Color.PURPLE)
@@ -162,10 +164,37 @@ function love.draw()
         end
     )
 
-    -- UI
+    -- =================================================================
+    -- 3D MODEL RENDERING
+    -- =================================================================
+    -- Render into a canvas with an attached depth buffer.
+    love.graphics.setCanvas({DEEP_CANVAS, depth = true})
+    love.graphics.clear(true, true, true)
+    love.graphics.setDepthMode("lequal", true)
+
+    love.graphics.setShader(shaders.model)
+    
+    -- Send matrices transposed so Love2D maps them correctly to the GLSL uniforms
+    shaders.model:send("u_model", mmath.mat4_transpose(model.model))
+    shaders.model:send("u_view",  mmath.mat4_transpose(model.view))
+    shaders.model:send("u_proj",  mmath.mat4_transpose(model.proj))
+
+    love.graphics.draw(model.mesh)
+    love.graphics.setShader()
+
+    love.graphics.setDepthMode()
+    love.graphics.setCanvas(nil)
+    love.graphics.draw(DEEP_CANVAS, 0, 0)
+
+    -- =================================================================
+    -- UI RENDERING
+    -- =================================================================
     love.graphics.setCanvas(nil)
     bench:draw()
     systems.imgui.process({0, 0, 160, HEIGHT})
 
+    -- =================================================================
+    -- POSTCONDITIONS
+    -- =================================================================
     assert(love.graphics.getCanvas() == nil, "the final blit must be onto the global canvas")
 end

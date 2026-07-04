@@ -530,7 +530,7 @@ function World:update(dt, scroll)
         bench:finish("lighting")
     else
         _G.debug_info["light steps"] = "off"
-    _G.debug_info["light N"] = "-"
+        _G.debug_info["light N"] = "-"
     end
     return self.processed_chunks
 end
@@ -679,29 +679,38 @@ function World:prepare_lighting_shader(scroll)
 end
 
 function World:draw(scroll)
+    -- updates debug info!
+
     local num_rendered_entities = 0
     local num_updated_entities = 0
     local num_rendered_tiles = 0
-    local min_x, min_y, max_x, max_y = 0, 0, 0, 0
+    -- B L O C K S
+    --[[
+    render steps:
+        - background tiles
+        - foreground tiles
+        - entities
+        - lighting overlay
+    --]]
+    local min_x = math.floor(scroll.x / BS)
+    local max_x = math.floor((scroll.x + WIDTH) / BS)
+    local min_y = math.floor(scroll.y / BS)
+    local max_y = math.floor((scroll.y + HEIGHT) / BS)
+    local size_x = max_x - min_x + 1
+    local size_y = max_y - min_y + 1
+    local lighting_offset = Vec2:new(0, 0)
+
+    if config.lighting then
+        self.light_surf = love.image.newImageData(size_x, size_y)
+    end
 
     if config.blocks then
         bench:start("blocks", Color.GREEN)
 
-        -- B L O C K S
-        min_x = math.floor(scroll.x / BS)
-        max_x = math.floor((scroll.x + WIDTH) / BS)
-        min_y = math.floor(scroll.y / BS)
-        max_y = math.floor((scroll.y + HEIGHT) / BS)
-        local size_x = max_x - min_x + 1
-        local size_y = max_y - min_y + 1
-        local lighting_offset = Vec2:new(0, 0)
-
         -- clear the image batch and light surface
         self.batch:clear()
         self.bg_batch:clear()
-        if config.lighting then
-            self.light_surf = love.image.newImageData(size_x, size_y)
-        end
+
 
         local lw = self.lightmap_w
         local lx = self.lightmap_min_x
@@ -722,9 +731,6 @@ function World:draw(scroll)
 
                 -- get light value
                 local light = self.lightmap1d[idx] or 0
-                local norm_light = light / MAX_LIGHT
-
-                -- goto continue
 
                 -- if there is foreground, draw that. Else, if background, draw that
                 if tile ~= nil and name ~= "air" then
@@ -738,17 +744,6 @@ function World:draw(scroll)
                     num_rendered_tiles = num_rendered_tiles + 1
                 end
 
-                -- only overlay block with darkness if the block itself is not a light source
-                -- if config.lighting then
-                --     if nbwand(name, BF.LIGHT_SOURCE) or (name == "air" and bg_name ~= "air") then
-                --             self.light_surf:setPixel(
-                --             tx - min_x, ty - min_y,
-                --             0, 0, 0, 1 - norm_light
-                --         )
-                --     end
-                --     table.insert(prints, {light or 0, tx * BS, screen_y})
-                -- end
-
                 -- calculate the lighting offset
                 if tx == min_x and ty == min_y then
                     lighting_offset.x = tx * BS - scroll.x
@@ -759,37 +754,33 @@ function World:draw(scroll)
             end
         end
 
-        -- B L O C K  L I G H T I N G
-
-        --[[
-        render steps:
-            - background tiles
-            - foreground tiles
-            - player
-            - lighting overlay
-        --]]
-
         local bg_light_mult = 0.5
         love.graphics.setColor(bg_light_mult, bg_light_mult, bg_light_mult, 1)
         love.graphics.draw(self.bg_batch)
         love.graphics.setColor(Color.WHITE)
         love.graphics.draw(self.batch)
+    end
 
-        -- render the entities (render here so they work with the lightings)
-        if config.rendering then
-            bench:start("entities", Color.CYAN)
-            num_rendered_entities, num_updated_entities = systems.render.process(self.processed_chunks)
-            bench:finish("entities")
-        end
+    -- render the entities (REGARDLESS of block render)
+    if config.entities then
+        bench:start("entities", Color.CYAN)
+        num_rendered_entities, num_updated_entities = systems.render.process(self.processed_chunks)
+        bench:finish("entities")
+    end
 
-        -- render the lightmap
-        if config.lighting then
-            self.light_surf = love.graphics.newImage(self.light_surf)
-            -- self.light_surf:setFilter("nearest", "nearest")
-            love.graphics.draw(self.light_surf, scroll.x + lighting_offset.x, scroll.y + lighting_offset.y, 0, BS, BS)
-        end
-        love.graphics.setColor(Color.WHITE)
+    -- render the lightmap (REGARDLESS of blocks render)
+    if config.lighting then
+        -- calculate the lighting offset
+        lighting_offset.x = min_x * BS - scroll.x
+        lighting_offset.y = min_y * BS - scroll.y
+        self.light_surf = love.graphics.newImage(self.light_surf)
+        -- self.light_surf:setFilter("nearest", "nearest")
+        love.graphics.draw(self.light_surf, scroll.x + lighting_offset.x, scroll.y + lighting_offset.y, 0, BS, BS)
+    end
+    love.graphics.setColor(Color.WHITE)
 
+    -- finish block rendering segment
+    if config.blocks then
         bench:finish("blocks")
     end
 

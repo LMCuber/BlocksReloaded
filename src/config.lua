@@ -4,7 +4,7 @@ local config = {
     shaders = true,
     lighting = true,
     physics = true,
-    rendering = true,
+    entities = true,
     blocks = true,
     vsync = true,
 }

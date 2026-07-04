@@ -121,7 +121,7 @@ function systems.imgui.process(imgui_area)
     -- create an imgui checkbox per config item
     for name, _ in pairs(config) do
         if not ({vsync = 0})[name] then
-            imgui.checkbox(commons.capitalize(name), config, name)
+            imgui.checkbox(name, config, name)
         end
     end
 
@@ -548,6 +548,8 @@ function systems.late_rects.process()
             love.graphics.rectangle("line", rect[1], rect[2], rect[3], rect[4])
         end
     end
+
+    love.graphics.setColor(Color.WHITE)
 
     -- clear the late rects
     sg.late_rects = {}

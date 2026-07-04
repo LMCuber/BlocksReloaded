@@ -1,4 +1,7 @@
-local palette_list = {"2000", "31", "bumblebit", "century", "dusted_sunset", "gun", "raiten", "redorb", "rust_gold", "twilight"}
+local palette_list = {
+    "2000", "31", "bumblebit", "century", "dusted_sunset",
+    "gun", "raiten", "redorb", "rust_gold", "twilight", "ink", "69"
+}
 local palettes = {}
 
 for _, p in ipairs(palette_list) do
