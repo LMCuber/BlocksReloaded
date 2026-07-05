@@ -8,10 +8,12 @@ comp.Inventory = {}
 comp.Inventory.__index = comp.Inventory
 comp.Inventory._name = "Inventory"
 
-function comp.Inventory:new(items)
+function comp.Inventory:new(items, amounts, render)
     return setmetatable({
         items = items,
-        index = 1
+        amounts = amounts,
+        index = 1,
+        render = render
     }, self)
 end
 

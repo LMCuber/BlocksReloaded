@@ -9,7 +9,6 @@ local shaders = require("src.shaders")
 local world = require("src.world")
 local systems = require("src.systems")
 local config = require("src.config")
-local math = require("math")
 local Color = require("src.color")
 local commons = require("src.libs.commons")
 local fonts = require("src.fonts")
@@ -30,14 +29,15 @@ ecs.create_entity(
         Vec2:new(0, 0),
         1.2
     ),
-    comp.Sprite:from_path("res/images/player_animations/dexter/run.png"),
+    comp.Sprite:from_path("res/images/player_animations/samurai/run.png"),
     comp.Hitbox:new(52, 80),  -- static hitbox
     comp.CameraAnchor:new(0.04),  -- camera follows its position
     comp.Controllable:new(),  -- can move using keyboard,
-    comp.Inventory:new({"torch", "torch", "supertorch"})  -- inventory to place blocks
+    comp.Inventory:new({"torch", "supertorch"}, {10, 10}, true)  -- inventory to place blocks
 )
 
 local processed_chunks = {}
+local player_skins = {"dexter", "samurai"}
 
 ---------------------------------------------------------------------
 
@@ -54,16 +54,17 @@ function love.load()
     _G.LIGHTING_CANVAS = love.graphics.newCanvas(love.graphics.getWidth(), love.graphics.getHeight())  -- when this canvas gets blitted onto next canvas, indermediately: lighting happens
     local icon = love.image.newImageData("res/images/visuals/windows_icon.png")
     love.window.setIcon(icon)
-    love.window.setVSync(config.vsync)
+    love.window.setVSync(config.cb.vsync)
 
-    palettes:send(shaders.palette, "pancakes")
+    palettes:send(shaders.palette, palettes.list[config.cm.palette_index])
 end
 
 local model = Model:new({
     obj_path = "res/models/katana.obj",
-    ortho_size = 6,
+    ortho_size = 30,
+    center = Vec3:new(600, 600),
     angle = Vec3:new(0, 0, 0),
-    avel = Vec3:new(0.7, 0.7, 0.7),
+    avel = Vec3:new(0.9, 0.2, 2.3),
     points = Color.NAVY,
 })
 
@@ -77,7 +78,7 @@ function love.update(dt)
     systems.singletons.process()
 
     -- other systems that don't just take processed_chunks as argument
-    if config.physics then
+    if config.cb.physics then
         bench:start("physics", Color.LIGHT_GRAY)
         systems.physics.process(processed_chunks, world)
         bench:finish("physics", false)
@@ -110,7 +111,7 @@ function love.draw()
     world:draw(systems._singletons.scroll)
 
     -- render chunk border rectangles (visual)
-    if config.borders then
+    if config.cb.borders then
         for _, chunk_key in ipairs(processed_chunks) do
             love.graphics.setColor(Color.CYAN)
             local cx, cy = commons.unpack(chunk_key)
@@ -122,41 +123,44 @@ function love.draw()
         end
     end
 
-    -- a batch of rectangles sent by the systems to render at once
     systems.late_rects.process()
-    systems.process_misc_draw_systems(processed_chunks)
 
     -- =================================================================
     -- 2D CAMERA ENDS HERE!
     -- =================================================================
     love.graphics.pop()
+    systems.process_misc_draw_systems(processed_chunks)
 
     -- =================================================================
     -- LIGHTMAP RENDERING -> CANVAS
     -- =================================================================
-    with(
-        CANVAS, config.lighting and shaders.lighting or nil,
-        function ()
-            love.graphics.draw(LIGHTING_CANVAS, 0, 0)
-        end,
-        function()
-            world:prepare_lighting_shader(systems._singletons.scroll)  -- sends data to shader including: light texture, offsets
-        end
-    )
+    love.graphics.setCanvas(CANVAS)
+    local shader
+    if config.cb.chiaroscuro then
+        shader = config.cb.lighting and shaders.lighting or nil
+    else
+        shader = config.cb.palette and shaders.palette or nil
+    end
+    love.graphics.setShader(shader)
+    world:prepare_lighting_shader(systems._singletons.scroll)  -- sends data to shader including: light texture, offsets
+    love.graphics.draw(LIGHTING_CANVAS, 0, 0)
 
     -- =================================================================
-    -- POST-PROCESSED CANVAS RENDERING -> MAIN WINDOW
+    -- CANVAS RENDERING -> MAIN WINDOW
     -- =================================================================
-    with(nil, config.shaders and shaders.palette or nil,
-        function()
-            bench:start("palette", Color.PURPLE)
-            love.graphics.draw(CANVAS, 0, 0)
-            bench:finish("palette")
-        end
-    )
+    love.graphics.setCanvas(nil)
+    if config.cb.chiaroscuro then
+        shader = config.cb.palette and shaders.palette or nil
+    else
+        shader = config.cb.lighting and shaders.lighting or nil
+    end
+    love.graphics.setShader(shader)
+    bench:start("palette", Color.PINK)
+    love.graphics.draw(CANVAS, 0, 0)
+    bench:finish("palette")
 
     -- =================================================================
-    -- 3D MODEL RENDERING ONTO DEEP_CANVAS -> MAIN WINDOW
+    -- 3D MODEL > DEEP_CANVAS -> MAIN WINDOW
     -- =================================================================
     love.graphics.setCanvas({DEEP_CANVAS, depth = true})
     love.graphics.setShader(shaders.model)
@@ -167,9 +171,7 @@ function love.draw()
     shaders.model:send("uView",  mmath.mat4_transpose(model.view))
     shaders.model:send("uProj",  mmath.mat4_transpose(model.proj))
 
-    bench:start("3d", Color.PINK)
     love.graphics.draw(model.mesh)
-    bench:finish("3d")
 
     -- model -> main window
     love.graphics.setShader()
@@ -183,6 +185,7 @@ function love.draw()
     love.graphics.setCanvas(nil)
     bench:draw()
     systems.imgui.process({0, 0, 160, HEIGHT})
+    systems.inventory_ui.process(processed_chunks)
 
     -- =================================================================
     -- POSTCONDITIONS

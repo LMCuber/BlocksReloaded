@@ -33,7 +33,7 @@ function imgui.end_()
     state.was_pressed = love.mouse.isDown(1)
 end
 
--- CONFIG
+-- cfg
 
 function imgui.setNextFont(font)
     state.font = font
@@ -45,7 +45,7 @@ end
 
 -- WIDGETS
 
-function imgui.combo(options, config, attr)
+function imgui.combo(options, cfg, attr)
     local w, h = state.width, 24
     -- arrow width and height
     local ah = h - 6
@@ -72,7 +72,7 @@ function imgui.combo(options, config, attr)
     )
 
     -- text
-    local index = config[attr]
+    local index = cfg[attr]
     love.graphics.print(options[index], state.cursor.x + state.padding.x + aw + state.padding.x, state.cursor.y)
 
     -- right arrow
@@ -98,11 +98,12 @@ function imgui.combo(options, config, attr)
     local is_pressed = love.mouse.isDown(1)
     if is_pressed and not state.was_pressed then
         if is_col_left then
-            config[attr] = math.max(config[attr] - 1, 1)
+            cfg[attr] = math.max(cfg[attr] - 1, 1)
+            return true
         elseif is_col_right then
-            config[attr] = math.min(config[attr] + 1, #options)
+            cfg[attr] = math.min(cfg[attr] + 1, #options)
+            return true
         end
-        return true
     end
     return false
 end
@@ -127,7 +128,7 @@ function imgui.label(text)
     state.cursor.y = state.cursor.y + h + state.padding.y
 end
 
-function imgui.checkbox(text, config, attr)
+function imgui.checkbox(text, cfg, attr)
     -- locals
     local w, h = state.width, 24
     local cw = h - 6  -- cw is the checkbox width
@@ -148,7 +149,7 @@ function imgui.checkbox(text, config, attr)
 
     -- tickmark
     local s = 2  -- tick shrinkage w.r.t. being fully stuck to the border
-    if config[attr] then
+    if cfg[attr] then
         love.graphics.setColor(Color.WHITE)
         love.graphics.line(
             checkbox[1] + s, checkbox[2] + (2 / 3) * cw,
@@ -168,7 +169,7 @@ function imgui.checkbox(text, config, attr)
     -- return if it is pressed
     local is_pressed = love.mouse.isDown(1)
     if is_col and is_pressed and not state.was_pressed then
-        config[attr] = not config[attr]
+        cfg[attr] = not cfg[attr]
         return true
     end
     return false

@@ -24,7 +24,7 @@ end
 function Benchmarker:finish(key, p)
     self.times[key].time = love.timer.getTime() - self.times[key].time
     if p then
-        print(math.floor(self.times[key].time * 1000) .. " / " .. 1 / love.timer.getFPS() * 1000 .. " ms")
+        print(commons.round_to(self.times[key].time * 1000, 0.001) .. " / " .. 1 / love.timer.getFPS() * 1000 .. " ms")
     end
 end
 

@@ -104,4 +104,13 @@ function mmath.mat4_transpose(m)
     }
 end
 
+function mmath.mat4_translate(x, y, z)
+    return {
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        x, y, z, 1
+    }
+end
+
 return mmath

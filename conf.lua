@@ -12,6 +12,6 @@ function love.conf(t)
     -- t.window.icon = "res/images/misc/icon.png"
     t.window.resizable = true
     t.window.vsync = false
-    -- t.window.fullscreen = true
+    t.window.fullscreen = true
     t.console = true
 end

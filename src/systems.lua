@@ -70,6 +70,8 @@ local systems = {
     camera = {},
     controllable = {},
     late_rects = {},
+    inventory_ui = {},
+
 }
 -- shorthand
 local sg = systems._singletons
@@ -121,20 +123,20 @@ function systems.imgui.process(imgui_area)
     imgui.hbar()
 
     -- create an imgui checkbox per config item
-    for name, _ in pairs(config) do
+    for name, _ in pairs(config.cb) do
         if not ({vsync = 0})[name] then
-            imgui.checkbox(name, config, name)
+            imgui.checkbox(name, config.cb, name)
         end
     end
 
     -- checkboxes that need execution on click
-    if imgui.checkbox("VSync", config, "vsync") then
-        love.window.setVSync(config.vsync)
+    if imgui.checkbox("VSync", config.cb, "vsync") then
+        love.window.setVSync(config.cb.vsync)
     end
 
     -- options
-    if imgui.combo(palettes.list, config, "palette_index") then
-        palettes:send(shaders.palette, palettes.list[config.palette_index])
+    if imgui.combo(palettes.list, config.cm, "palette_index") then
+        palettes:send(shaders.palette, palettes.list[config.cm.palette_index])
     end
 
     imgui.end_()
@@ -173,7 +175,7 @@ function systems.render.process(chunks)
 
         -- rendering location
         local hitbox = ecs.try_component(ent_id, comp.Hitbox)
-        if hitbox ~= nil then
+        if hitbox then
             -- important check. we can't rely on race conditions between system updates
             if hitbox.is_dynamic then
                 goto continue
@@ -215,7 +217,7 @@ function systems.render.process(chunks)
                 )
             end
 
-            if config.hitboxes then
+            if config.cb.hitboxes then
                 -- hitbox
                 love.graphics.setColor(Color.ORANGE)
                 love.graphics.rectangle("line", tr.pos.x, tr.pos.y, hitbox.w, hitbox.h)
@@ -235,7 +237,7 @@ function systems.render.process(chunks)
 
                 -- other debug information
                 local ctrl = ecs.try_component(ent_id, comp.Controllable)
-                if ctrl ~= nil then
+                if ctrl then
                     if ctrl.grounded then
                         love.graphics.setColor(Color.ORANGE)
                         love.graphics.print("grounded", tr.pos.x, tr.pos.y - 80)
@@ -359,7 +361,7 @@ function systems.controllable.process(chunks, world)
         ctrl.grounded = false
 
         local hitbox = ecs.try_component(ent_id, comp.Hitbox)
-        if hitbox ~= nil then
+        if hitbox then
             local probe_ty = math.floor((tr.pos.y + hitbox.h + 1) / BS)
             for ptx = math.floor(tr.pos.x / BS), math.floor((tr.pos.x + hitbox.w - 1) / BS) do
                 local block_id = world:abs_pos_to_tile(ptx, probe_ty)
@@ -426,6 +428,41 @@ function systems.controllable.process(chunks, world)
             sprite.anim_mode = "jump"
         end
     end
+end
+
+function systems.inventory_ui.process(chunks)
+    local inv_batch = love.graphics.newSpriteBatch(blocks.sprs, 64)
+    local x = 600
+    local y = 50
+
+    for _, entry in ipairs(ecs.get_components(chunks, comp.Inventory)) do
+        local ent_id, _, _, inv = commons.unpack(entry)
+        if inv.render then
+            for i = 1, #inv.items do
+                local tile = inv.items[i]
+                local id = blocks.id[tile]
+                inv_batch:add(blocks.quads[id], x, y, 0, S, S)
+
+                -- highlight selected item
+                print(i, inv.index)
+                if i == inv.index then
+                    love.graphics.setColor(Color.WHITE)
+                    love.graphics.setLineWidth(S)
+                    love.graphics.rectangle("line", x - S, y - S, BS + S * 2, BS + S * 2)
+                    love.graphics.setLineWidth(1)
+                end
+
+                x = x + BS + S
+            end
+        end
+
+        local ctrl = ecs.try_component(ent_id, comp.Controllable)
+        if ctrl then
+            -- print(sg)
+        end
+    end
+
+    love.graphics.draw(inv_batch)
 end
 
 function systems.editing.process(chunks, world)
@@ -549,7 +586,7 @@ end
 
 function systems.late_rects.process()
     -- draw all the late rects to the screen
-    if config.hitboxes then
+    if config.cb.hitboxes then
         for _, rect in ipairs(sg.late_rects) do
             love.graphics.setColor(rect[5])
             love.graphics.rectangle("line", rect[1], rect[2], rect[3], rect[4])

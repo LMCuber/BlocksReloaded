@@ -192,26 +192,20 @@ function Model:load_obj()
                 end
             end
             -- check if we need to split face into multiple triangles
-            if vert_count == 3 then
-                for _, i in ipairs({1, 2, 3}) do
-                    table.insert(indices, idx + i)
-                end
-            elseif vert_count == 4 then
-                for _, i in ipairs({1, 2, 3, 1, 4, 3}) do
-                    table.insert(indices, idx + i)
-                end
-            else
-                print(face_count .. "th face skipped; had " .. vert_count .. " vertices")
-                faces_skipped = faces_skipped + 1
+            -- smart triangulation formula invented by me
+            for i = 0, vert_count - 3 do
+                table.insert(indices, idx + 1)
+                table.insert(indices, idx + 2 + i)
+                table.insert(indices, idx + 3 + i)
             end
+
+            -- continuation step
             idx = idx + vert_count
             face_count = face_count + 1
         end
 
         ::continue::
     end
-
-    print("→ " .. commons.round_to(faces_skipped / face_count * 100, 0.1) .. "% of faces skipped")
 
     local vertexFormat = {
         {"VertexPosition", "float", 3},
@@ -228,7 +222,11 @@ function Model:update(dt)
 
     self.angle = self.angle:add(self.avel:scale(dt))
 
-    self.model = mmath.mat4_multiply(mmath.mat4_rotateY(self.angle.y), mmath.mat4_rotateX(self.angle.x))
+    local pos_x = ((self.center.x / w) * 2 - 1) * (self.ortho_size * aspect)
+    local pos_y = (1 - (self.center.y / h) * 2) * self.ortho_size
+
+    local rotation = mmath.mat4_multiply(mmath.mat4_rotateY(self.angle.y), mmath.mat4_rotateX(self.angle.x))
+    self.model = mmath.mat4_multiply(mmath.mat4_translate(pos_x, pos_y, 0), rotation)
     self.view = mmath.mat4_lookAt({0, 0, 12}, {0, 0, 0}, {0, 1, 0})
 
     self.proj = mmath.mat4_ortho(

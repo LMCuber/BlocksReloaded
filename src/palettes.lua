@@ -1,9 +1,7 @@
-local commons = require("src.libs.commons")
-
 local palettes = {
     list = {
-        "2000", "31", "bumblebit", "century", "dusted_sunset",
-        "gun", "raiten", "redorb", "rust_gold", "twilight", "ink", "69", "pancakes"
+        "2000", "31", "dusted_sunset",
+        "gun", "redorb", "rust_gold", "twilight", "pancakes"
     }
 }
 

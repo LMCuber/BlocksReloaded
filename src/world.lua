@@ -6,14 +6,12 @@ local biomes = require("src.biome")
 local ecs = require("src.libs.ecs")
 local comp = require("src.components")
 local systems = require("src.systems")
-local fonts = require("src.fonts")
 local yaml = require("src.libs.yaml")
 local config = require("src.config")
-local commons = require("src.libs.commons")
 local shaders = require("src.shaders")
 
 -- constants
-local VIEW_PADDING = MAX_LIGHT
+local VIEW_PADDING = MAX_LIGHT + 1
 
 -- WORLD CLASS
 local World = {}
@@ -394,7 +392,8 @@ function World:modify_chunk(cx, cy)
                             cx, cy,
                             comp.Transform:new(
                                 Vec2:new(abs_x * BS, (abs_y - 7 - i) * BS),
-                                Vec2:new(0, 0)
+                                Vec2:new(0, 0),
+                                0.2
                             ),
                             comp.Sprite:from_path("res/images/statics/portal/idle.png"),
                             comp.Hitbox:dynamic()
@@ -524,7 +523,7 @@ end
 
 function World:update(dt, scroll)
     self:get_processed_chunks(scroll)
-    if config.lighting then
+    if config.cb.lighting then
         bench:start("lighting", Color.YELLOW)
         self:propagate_lighting(scroll)
         bench:finish("lighting")
@@ -700,11 +699,11 @@ function World:draw(scroll)
     local size_y = max_y - min_y + 1
     local lighting_offset = Vec2:new(0, 0)
 
-    if config.lighting then
+    if config.cb.lighting then
         self.light_surf = love.image.newImageData(size_x, size_y)
     end
 
-    if config.blocks then
+    if config.cb.blocks then
         bench:start("blocks", Color.GREEN)
 
         -- clear the image batch and light surface
@@ -762,14 +761,14 @@ function World:draw(scroll)
     end
 
     -- render the entities (REGARDLESS of block render)
-    if config.entities then
+    if config.cb.entities then
         bench:start("entities", Color.CYAN)
         num_rendered_entities, num_updated_entities = systems.render.process(self.processed_chunks)
         bench:finish("entities")
     end
 
     -- render the lightmap (REGARDLESS of blocks render)
-    if config.lighting then
+    if config.cb.lighting then
         -- calculate the lighting offset
         lighting_offset.x = min_x * BS - scroll.x
         lighting_offset.y = min_y * BS - scroll.y
@@ -780,7 +779,7 @@ function World:draw(scroll)
     love.graphics.setColor(Color.WHITE)
 
     -- finish block rendering segment
-    if config.blocks then
+    if config.cb.blocks then
         bench:finish("blocks")
     end
 
