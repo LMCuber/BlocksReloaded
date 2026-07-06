@@ -23,8 +23,13 @@ local Button = {
 ecs.singletons.joystick = require("src.joystick")
 local joystick = ecs.singletons.joystick
 
+-- =================================================================
+-- buttons: down, clicked, released (defualt_key_data)
+-- keys:    defualt_key_data
+-- wheels:  clicked
+-- =================================================================
 local function default_key_data()
-    -- return all off states
+    -- return entirely composed of off states
     return {down = false, _was_down = false, clicked = false, released = false}
 end
 
@@ -49,11 +54,13 @@ local systems = {
             [Button.MOUSE_5] = default_key_data(),
         },
         keys = {},
+        wheels = {x = 0, y = 0, buffer_x = 0, buffer_y = 0},
         late_rects = {},
         dead_zone = nil
     },
 
     -- update step systems
+    cleanup = {},
     _misc_update = {
         relocate = {},
         timer = {}
@@ -73,8 +80,12 @@ local systems = {
     inventory_ui = {},
 
 }
--- shorthand
 local sg = systems._singletons
+
+function love.wheelmoved(x, y)
+    sg.wheels.buffer_x = x
+    sg.wheels.buffer_y = y
+end
 
 -- keyboard map
 local alphabet = "abcdefghijklmnopqrstuvwxyz"
@@ -240,7 +251,6 @@ function systems.render.process(chunks)
                 if ctrl then
                     if ctrl.grounded then
                         love.graphics.setColor(Color.ORANGE)
-                        love.graphics.print("grounded", tr.pos.x, tr.pos.y - 80)
                     end
                 end
             end
@@ -432,28 +442,40 @@ end
 
 function systems.inventory_ui.process(chunks)
     local inv_batch = love.graphics.newSpriteBatch(blocks.sprs, 64)
-    local x = 600
-    local y = 50
+    local anchor_x = 600
+    local anchor_y = 50
+    local x = anchor_x
+    local y = anchor_y
+    local lw = 1  -- line width
 
     for _, entry in ipairs(ecs.get_components(chunks, comp.Inventory)) do
         local ent_id, _, _, inv = commons.unpack(entry)
         if inv.render then
+            -- render background
+            love.graphics.setColor(Color.NAVY)
+            love.graphics.rectangle("fill", x - lw, y - lw, #inv.items * (BS + lw) + lw, BS + lw * 2)
+            love.graphics.setColor(Color.WHITE)
+
+            -- render the individual blocks
             for i = 1, #inv.items do
                 local tile = inv.items[i]
                 local id = blocks.id[tile]
                 inv_batch:add(blocks.quads[id], x, y, 0, S, S)
 
-                -- highlight selected item
-                print(i, inv.index)
-                if i == inv.index then
-                    love.graphics.setColor(Color.WHITE)
-                    love.graphics.setLineWidth(S)
-                    love.graphics.rectangle("line", x - S, y - S, BS + S * 2, BS + S * 2)
-                    love.graphics.setLineWidth(1)
-                end
-
-                x = x + BS + S
+                -- increment
+                x = x + BS + lw
             end
+
+            -- highlight selected item
+            love.graphics.setColor(Color.WHITE)
+            love.graphics.setLineWidth(1)
+            love.graphics.rectangle("line", anchor_x + (inv.index - 1) * BS, y - lw, BS + lw * 2, BS + lw * 2)
+            love.graphics.setLineWidth(1)
+
+            -- react to mouse wheel input
+            local inc = sg.wheels.y
+            inv.index = inv.index + inc
+            inv.index = math.max(math.min(inv.index, #inv.items), 1)
         end
 
         local ctrl = ecs.try_component(ent_id, comp.Controllable)
@@ -584,6 +606,16 @@ function systems.singletons.process()
     end
 end
 
+-- if there is an event, the buffer gets set to 1
+-- cleanup uses the buffer value as current, BUT erases it (so next iteration uses an empty buffer value as current)
+function systems.cleanup.process()
+    -- resets up some variables (must be called FIRST in main loop, NOT LAST)
+    sg.wheels.x = sg.wheels.buffer_x
+    sg.wheels.y = sg.wheels.buffer_y
+    sg.wheels.buffer_x = 0
+    sg.wheels.buffer_y = 0
+end
+
 function systems.late_rects.process()
     -- draw all the late rects to the screen
     if config.cb.hitboxes then
@@ -598,8 +630,6 @@ function systems.late_rects.process()
     -- clear the late rects
     sg.late_rects = {}
 end
-
--- M I S C E L L A N E O U S  S Y S T E M S -------------------------------------------------------
 
 function systems._misc_update.relocate.process(chunks)
     for _, entry in ipairs(ecs.get_components(chunks, comp.Transform)) do

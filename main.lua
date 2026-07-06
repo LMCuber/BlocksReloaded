@@ -29,11 +29,11 @@ ecs.create_entity(
         Vec2:new(0, 0),
         1.2
     ),
-    comp.Sprite:from_path("res/images/player_animations/samurai/run.png"),
+    comp.Sprite:from_path("res/images/player_animations/dexter/run.png"),
     comp.Hitbox:new(52, 80),  -- static hitbox
     comp.CameraAnchor:new(0.04),  -- camera follows its position
     comp.Controllable:new(),  -- can move using keyboard,
-    comp.Inventory:new({"torch", "supertorch"}, {10, 10}, true)  -- inventory to place blocks
+    comp.Inventory:new({"torch", "supertorch", "workbench"}, {10, 10, 3}, true)  -- inventory to place blocks
 )
 
 local processed_chunks = {}
@@ -49,9 +49,14 @@ function love.keypressed(key)
 end
 
 function love.load()
-    _G.CANVAS = love.graphics.newCanvas(love.graphics.getWidth(), love.graphics.getHeight())  -- penultimate canvas before blitting onto main window
-    _G.DEEP_CANVAS = love.graphics.newCanvas(love.graphics.getWidth(), love.graphics.getHeight())  -- canvas to be used with a depth field
-    _G.LIGHTING_CANVAS = love.graphics.newCanvas(love.graphics.getWidth(), love.graphics.getHeight())  -- when this canvas gets blitted onto next canvas, indermediately: lighting happens
+    local deep_scale = 1
+    _G.canvas = {
+        main = love.graphics.newCanvas(love.graphics.getWidth(), love.graphics.getHeight()),  -- penultimate canvas before blitting onto main window
+        deep = love.graphics.newCanvas(love.graphics.getWidth() / deep_scale, love.graphics.getHeight() / deep_scale),  -- canvas to be used with a depth field,
+        lighting = love.graphics.newCanvas(love.graphics.getWidth(), love.graphics.getHeight()),  -- when this canvas gets blitted onto next canvas, indermediately: lighting happens
+    }
+    canvas.deep:setFilter("nearest")
+
     local icon = love.image.newImageData("res/images/visuals/windows_icon.png")
     love.window.setIcon(icon)
     love.window.setVSync(config.cb.vsync)
@@ -61,7 +66,7 @@ end
 
 local model = Model:new({
     obj_path = "res/models/katana.obj",
-    ortho_size = 30,
+    ortho_size = 20,
     center = Vec3:new(600, 600),
     angle = Vec3:new(0, 0, 0),
     avel = Vec3:new(0.9, 0.2, 2.3),
@@ -74,7 +79,8 @@ function love.update(dt)
 
     processed_chunks = world:update(dt, systems._singletons.scroll)
 
-    -- singletons first
+    -- singleton systems first
+    systems.cleanup.process()
     systems.singletons.process()
 
     -- other systems that don't just take processed_chunks as argument
@@ -97,7 +103,7 @@ function love.draw()
     -- =================================================================
     -- SETUP
     -- =================================================================
-    love.graphics.setCanvas(LIGHTING_CANVAS)
+    love.graphics.setCanvas(canvas.lighting)
     love.graphics.setShader(nil)
     love.graphics.setColor({0.14, 0.12, 0.24})
     love.graphics.rectangle("fill", 0, 0, WIDTH, HEIGHT)
@@ -132,9 +138,9 @@ function love.draw()
     systems.process_misc_draw_systems(processed_chunks)
 
     -- =================================================================
-    -- LIGHTMAP RENDERING -> CANVAS
+    -- LIGHTMAP RENDERING -> canvas.main
     -- =================================================================
-    love.graphics.setCanvas(CANVAS)
+    love.graphics.setCanvas(canvas.main)
     local shader
     if config.cb.chiaroscuro then
         shader = config.cb.lighting and shaders.lighting or nil
@@ -143,10 +149,10 @@ function love.draw()
     end
     love.graphics.setShader(shader)
     world:prepare_lighting_shader(systems._singletons.scroll)  -- sends data to shader including: light texture, offsets
-    love.graphics.draw(LIGHTING_CANVAS, 0, 0)
+    love.graphics.draw(canvas.lighting, 0, 0)
 
     -- =================================================================
-    -- CANVAS RENDERING -> MAIN WINDOW
+    -- canvas.main RENDERING -> MAIN WINDOW
     -- =================================================================
     love.graphics.setCanvas(nil)
     if config.cb.chiaroscuro then
@@ -156,13 +162,13 @@ function love.draw()
     end
     love.graphics.setShader(shader)
     bench:start("palette", Color.PINK)
-    love.graphics.draw(CANVAS, 0, 0)
+    love.graphics.draw(canvas.main, 0, 0)
     bench:finish("palette")
 
     -- =================================================================
-    -- 3D MODEL > DEEP_CANVAS -> MAIN WINDOW
+    -- 3D MODEL > canvas.deep -> MAIN WINDOW
     -- =================================================================
-    love.graphics.setCanvas({DEEP_CANVAS, depth = true})
+    love.graphics.setCanvas({canvas.deep, depth = true})
     love.graphics.setShader(shaders.model)
     love.graphics.clear(true, true, true)
     love.graphics.setDepthMode("lequal", true)
@@ -177,7 +183,9 @@ function love.draw()
     love.graphics.setShader()
     love.graphics.setDepthMode()
     love.graphics.setCanvas(nil)
-    love.graphics.draw(DEEP_CANVAS, 0, 0)
+    local sx = love.graphics.getWidth() / canvas.deep:getWidth()
+    local sy = love.graphics.getHeight() / canvas.deep:getHeight()
+    love.graphics.draw(canvas.deep, 0, 0, 0, sx, sy)
 
     -- =================================================================
     -- UI RENDERING
