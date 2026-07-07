@@ -14,6 +14,7 @@ local commons = require("src.libs.commons")
 local fonts = require("src.fonts")
 local palettes = require("src.palettes")
 local mmath = require("src.libs.mmath")
+local menu = require("src.menu")
 
 ---------------------------------------------------------------------
 
@@ -33,11 +34,12 @@ ecs.create_entity(
     comp.Hitbox:new(52, 80),  -- static hitbox
     comp.CameraAnchor:new(0.04),  -- camera follows its position
     comp.Controllable:new(),  -- can move using keyboard,
-    comp.Inventory:new({"torch", "supertorch", "workbench"}, {10, 10, 3}, true)  -- inventory to place blocks
+    comp.Inventory:new({"torch", "supertorch", "anvil"}, {10, 10, 3}, true)  -- inventory to place blocks
 )
 
 local processed_chunks = {}
 local player_skins = {"dexter", "samurai"}
+local current_menu = nil
 
 ---------------------------------------------------------------------
 
@@ -65,13 +67,14 @@ function love.load()
 end
 
 local model = Model:new({
-    obj_path = "res/models/katana.obj",
-    ortho_size = 20,
+    obj_path = "res/models/sword.obj",
+    ortho_size = 40,
     center = Vec3:new(600, 600),
     angle = Vec3:new(0, 0, 0),
     avel = Vec3:new(0.9, 0.2, 2.3),
     points = Color.NAVY,
 })
+local imgui_area = {0, 0, 160, HEIGHT}
 
 function love.update(dt)
     _G.debug_info = {}
@@ -79,9 +82,7 @@ function love.update(dt)
 
     processed_chunks = world:update(dt, systems._singletons.scroll)
 
-    -- singleton systems first
-    systems.cleanup.process()
-    systems.singletons.process()
+    systems.singletons.process(imgui_area)
 
     -- other systems that don't just take processed_chunks as argument
     if config.cb.physics then
@@ -90,9 +91,22 @@ function love.update(dt)
         bench:finish("physics", false)
     end
 
+    -- update the UI elements
     model:update(dt)
+    if current_menu ~= nil then
+        local closed = current_menu:update()
+        if closed then
+            current_menu = nil
+        end
+    end
 
-    systems.editing.process(processed_chunks, world)
+    -- update the editing (and get new model potentially)
+    local new_menu = systems.editing.process(processed_chunks, world)
+    if new_menu ~= nil then
+        current_menu = menu.new_menu(new_menu)
+    end
+
+    -- misc system updates
     systems.controllable.process(processed_chunks, world)
     systems.process_misc_update_systems(processed_chunks)
 end
@@ -192,8 +206,13 @@ function love.draw()
     -- =================================================================
     love.graphics.setCanvas(nil)
     bench:draw()
-    systems.imgui.process({0, 0, 160, HEIGHT})
+    systems.imgui.process(imgui_area)
     systems.inventory_ui.process(processed_chunks)
+
+    -- render the current menu
+    if current_menu ~= nil then
+        current_menu:draw()
+    end
 
     -- =================================================================
     -- POSTCONDITIONS

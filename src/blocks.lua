@@ -20,7 +20,8 @@ _G.BF = {
     ORE          = 0,  -- coal, titanium, diamond, etc.
     ORNAMENT     = 0,  -- flowers, rocks, etc. Subset of "walkable".
     UNBREAKABLE  = 0,  -- blackstone etc.
-    SOLID        = 0
+    SOLID        = 0,
+    MENU        = 0,  -- workbench, anvil, etc that open up a menu
 }
 
 -- set the enum values from 0 to powers of 2 (they are initialized at 0 by defaylt)
@@ -39,7 +40,9 @@ local flags = {
     ["red-poppy"]    = BF.ORNAMENT,
     ["yellow-poppy"] = BF.ORNAMENT,
     orchid           = BF.ORNAMENT,
-    blackstone       = BF.UNBREAKABLE
+    blackstone       = BF.UNBREAKABLE,
+    workbench        = BF.MENU,
+    anvil            = BF.MENU,
 }
 
 -- subset flags that automatically need to be set beforehand

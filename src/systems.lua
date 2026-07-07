@@ -13,7 +13,7 @@ local config = require("src.config")
 local palettes = require("src.palettes")
 local shaders = require("src.shaders")
 
-local Button = {
+_G.Button = {
     LEFT = 1,
     RIGHT = 2,
     MIDDLE = 3,
@@ -24,13 +24,13 @@ ecs.singletons.joystick = require("src.joystick")
 local joystick = ecs.singletons.joystick
 
 -- =================================================================
--- buttons: down, clicked, released (defualt_key_data)
+-- buttons: down, clicked, released, consumed (defualt_key_data)
 -- keys:    defualt_key_data
 -- wheels:  clicked
 -- =================================================================
 local function default_key_data()
     -- return entirely composed of off states
-    return {down = false, _was_down = false, clicked = false, released = false}
+    return {down = false, _was_down = false, clicked = false, released = false, consumed = false}
 end
 
 local systems = {
@@ -60,7 +60,6 @@ local systems = {
     },
 
     -- update step systems
-    cleanup = {},
     _misc_update = {
         relocate = {},
         timer = {}
@@ -121,8 +120,6 @@ function systems._misc_update.timer.process(chunks)
 end
 
 function systems.imgui.process(imgui_area)
-    sg.dead_zone = imgui_area
-
     imgui.begin("Settings", commons.unpack(imgui_area))
 
     imgui.setNextFont(fonts.orbitron)
@@ -472,23 +469,22 @@ function systems.inventory_ui.process(chunks)
             love.graphics.rectangle("line", anchor_x + (inv.index - 1) * BS, y - lw, BS + lw * 2, BS + lw * 2)
             love.graphics.setLineWidth(1)
 
-            -- react to mouse wheel input
-            local inc = sg.wheels.y
-            inv.index = inv.index + inc
-            inv.index = math.max(math.min(inv.index, #inv.items), 1)
-        end
-
-        local ctrl = ecs.try_component(ent_id, comp.Controllable)
-        if ctrl then
-            -- print(sg)
+            -- react to mouse wheel input if is controllable
+            local ctrl = ecs.try_component(ent_id, comp.Controllable)
+            if ctrl then
+                local inc = sg.wheels.y
+                inv.index = inv.index + inc
+                inv.index = math.max(math.min(inv.index, #inv.items), 1)
+            end
         end
     end
 
     love.graphics.draw(inv_batch)
 end
 
-function systems.editing.process(chunks, world)
+function systems.editing.process(chunks, world, current_menu)
     local Intent = comp.Intent
+    local new_menu = nil
 
     -- controllable + inventory means editing for now
     for _, entry in ipairs(ecs.get_components(chunks, comp.Inventory, comp.Controllable)) do
@@ -504,17 +500,30 @@ function systems.editing.process(chunks, world)
         local rect_y = (cy * CH + ry - 1) * BS
         table.insert(sg.late_rects, {rect_x, rect_y, BS, BS, Color.ORANGE})
 
+        -- check right click causing some other action
+        if sg.buttons[Button.RIGHT].clicked then
+            if bwand(current, BF.MENU) then
+                new_menu = current
+            end
+        end
+
         -- check which action is triggered by clicking mouse
-        if sg.buttons[Button.LEFT].clicked then
+        if sg.buttons[Button.LEFT].clicked and not sg.buttons[Button.LEFT].consumed then
             if current == nil or bwand(current, BF.EMPTY) then
                 ctrl.intent = Intent.PLACE
             else
                 ctrl.intent = Intent.BREAK
             end
+            sg.buttons[Button.LEFT].consumed = true
+        end
+
+        -- diminish intent
+        if sg.buttons[Button.LEFT].released then
+            ctrl.intent = Intent.NONE
         end
 
         -- RIGHT MOUSE TESTING
-        if sg.buttons[Button.RIGHT].clicked then
+        if false and sg.buttons[Button.RIGHT].clicked and not sg.buttons[Button.LEFT].consumed then
             local tr = ecs.try_component(ent_id, comp.Transform)
             local hitbox = ecs.try_component(ent_id, comp.Hitbox)
 
@@ -544,9 +553,11 @@ function systems.editing.process(chunks, world)
                     comp.Timer:new(1)
                 )
             end
+
+            sg.buttons[Button.LEFT].consumed = true
         end
 
-        if (sg.buttons[Button.LEFT].down) then
+        if sg.buttons[Button.LEFT].down then
             if ctrl.intent == Intent.PLACE then
                 if current == nil or bwand(current, BF.EMPTY) then
                     world:place(cx, cy, rx, ry, inv.items[inv.index])
@@ -556,18 +567,25 @@ function systems.editing.process(chunks, world)
             end
         end
     end
+
+    return new_menu
 end
 
-function systems.singletons.process()
+
+-- if there is an event, the buffer gets set to 1
+-- init uses the buffer value as current, BUT erases it (so next iteration uses an empty buffer value as current)
+function systems.singletons.process(dead_zone)
     -- get mouse position
     local _x, _y = love.mouse.getPosition()
     sg.mouse = {x = _x, y = _y}
 
-    -- all deadzone-limited buttons
+    -- all deadzone-limited buttons (and unconsumed the buttons)
     if sg.dead_zone == nil or not commons.collidepointmouse(commons.unpack(sg.dead_zone)) then
         for button_id, state in pairs(sg.buttons) do
+            state.consumed = false
             local is_down = love.mouse.isDown(button_id)  -- e.g. 1 or 3
             state.clicked = is_down and not state.down
+            state.released = not is_down and state.down
             state._was_down = state.down
             state.down = is_down
         end
@@ -604,11 +622,10 @@ function systems.singletons.process()
     for axis_id, _ in pairs(joystick.axes) do
         joystick.axes[axis_id] = joystick.current:getAxis(axis_id)
     end
-end
 
--- if there is an event, the buffer gets set to 1
--- cleanup uses the buffer value as current, BUT erases it (so next iteration uses an empty buffer value as current)
-function systems.cleanup.process()
+    -- reset all previous frame's dead zones
+    sg.dead_zone = dead_zone
+
     -- resets up some variables (must be called FIRST in main loop, NOT LAST)
     sg.wheels.x = sg.wheels.buffer_x
     sg.wheels.y = sg.wheels.buffer_y
