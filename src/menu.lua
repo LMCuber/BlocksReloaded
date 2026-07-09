@@ -24,12 +24,12 @@ function menu.Anvil:new()
         rect = {love.graphics.getWidth() / 2 - w / 2, love.graphics.getHeight() / 2 - h / 2, w, h},
         model = Model:new({
             obj_path = "res/models/katana.obj",
-            ortho_size = 30,
-            center = Vec3:new(love.graphics.getWidth() / 2 - 40, love.graphics.getHeight() / 2 - 20),
+            ortho_size = 32,
+            center = Vec3:new(love.graphics.getWidth() / 2 - 60, love.graphics.getHeight() / 2 - 40),
             angle = Vec3:new(0, 0, -math.pi / 2.5),
             avel = Vec3:new(0, 0, 0),
             points = Color.NAVY,
-        })
+        }),
     }, self)
 end
 

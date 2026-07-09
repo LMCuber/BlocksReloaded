@@ -10,7 +10,7 @@ local function load_shader(name, frag_path, vert_path)
     end
 end
 
-load_shader("model", "src/shaders/brdf.frag", "src/shaders/perspective.vert")
+load_shader("model", "src/shaders/bsdf.frag", "src/shaders/perspective.vert")
 
 load_shader("lighting", "src/shaders/lighting.frag")
 load_shader("palette", "src/shaders/palette.frag")

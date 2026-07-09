@@ -62,6 +62,16 @@ function Model:load_mtl(mtl_file)
             self.materials[mtl_path][current_mtl]["Kd"] = color
         end
 
+        -- metallicness color
+        if args[1] == "Pm" then
+            local color = {
+                tonumber(args[2]),
+                tonumber(args[3]),
+                tonumber(args[4]),
+            }
+            self.materials[mtl_path][current_mtl]["Pm"] = color
+        end
+
         ::continue::
     end
 
@@ -72,12 +82,8 @@ function Model:load_obj()
     local unique_vertices = {}
     local vertices = {}
     local normals = {}
+    local texture_uvs = {}
     local indices = {}
-    local vertices_normalized = false
-
-    -- debug information
-    local faces_skipped = 0
-    local face_count = 0
 
     -- the current indices index
     local idx = 0
@@ -119,36 +125,23 @@ function Model:load_obj()
         if args[1] == "vn" then
             local normal = {
                 tonumber(args[2]),
-                tonumber(args[3]),
+                -tonumber(args[3]),
                 tonumber(args[4]),
             }
             table.insert(normals, normal)
         end
 
+        -- parse the texture uv positions
+        if args[1] == "vt" then
+            local uv = {
+                tonumber(args[2]),
+                tonumber(args[3]),
+            }
+            table.insert(texture_uvs, uv)
+        end
+
         -- parse faces
         if args[1] == "f" then
-            -- since f appears after v, we assume that all vertices have been loaded at this point in time.
-            -- so we can normalize the vertices to have maximum length of 1 (just ONCE though)
-            if not vertices_normalized then
-                local max_len = 0
-                -- find max
-                for _, vertex_pos in ipairs(vertices) do
-                    local len = math.sqrt(vertex_pos[1] ^ 2 + vertex_pos[2] ^ 2 + vertex_pos[3] ^ 2)
-                    if len > max_len then
-                        max_len = len
-                    end
-                end
-                -- normalize all vertices in terms of max
-                for i, vertex_pos in ipairs(vertices) do
-                    vertices[i] = {
-                        vertex_pos[1] / max_len,
-                        vertex_pos[2] / max_len,
-                        vertex_pos[3] / max_len,
-                    }
-                end
-                vertices_normalized = true
-            end
-
             -- create new vertices (with color and normal) made possible by indexing by the vert_index INTO the unique_vertices list
             -- then bind those new vertices together with a set of triangles (and add to the indices list)
             -- so basically all faces make their own pair of vertices with their own colors and normals
@@ -163,29 +156,36 @@ function Model:load_obj()
                 local diffuse = commons.rand_rgb()
                 color = {diffuse[1], diffuse[2], diffuse[3], 1.0}
             end
+
+            -- normal and texture information is stored in the faces. But we GPU doesn't know what a face is so we need to give that data
+            -- to the vertices themselves. (vertices will have duplicate attributes)
+
             local vert_count = 0
             for i, vert_data in ipairs(args) do
                 if i > 1 then
                     -- parse the face data
-                    local data, vert_index, normal
+                    local data, vert_index, uv, normal
                     if string.find(vert_data, "//") then
                         -- no texture data, just vertex//normal
                         data = commons.split(vert_data, "//")
                         vert_index = tonumber(data[1])
                         normal = normals[tonumber(data[2])]
+                        uv = {0.0, 0.0}
                     else
                         -- vertex/texture uv/normal
                         data = commons.split(vert_data, "/")
                         vert_index = tonumber(data[1])
+                        uv = texture_uvs[tonumber(data[2])]
                         normal = normals[tonumber(data[3])]
                     end
                     local vertex_pos = unique_vertices[vert_index]
 
-                    -- create a new vertex with correct index and correct color for this specific face
+                    -- create a new vertex with correct vertex data
                     local vertex = {
                         vertex_pos[1], vertex_pos[2], vertex_pos[3],
                         color[1], color[2], color[3], color[4],
-                        normal[1], normal[2], normal[3]
+                        normal[1], normal[2], normal[3],
+                        uv[1], uv[2]
                     }
                     table.insert(vertices, vertex)
                     vert_count = vert_count + 1
@@ -201,16 +201,35 @@ function Model:load_obj()
 
             -- continuation step
             idx = idx + vert_count
-            face_count = face_count + 1
         end
 
         ::continue::
     end
 
+    -- normalize all the vertices
+    local max_len = 0
+    for _, vertex_pos in ipairs(unique_vertices) do
+        local len = math.sqrt(vertex_pos[1] ^ 2 + vertex_pos[2] ^ 2 + vertex_pos[3] ^ 2)
+        if len > max_len then
+            max_len = len
+        end
+    end
+
+    -- if max_len > 0 then
+    --     -- change the already created vertices in their final array instead of constructing this array again
+    --     for i, vertex in ipairs(vertices) do
+    --         vertices[i][1] = vertex[1] / max_len
+    --         vertices[i][2] = vertex[2] / max_len
+    --         vertices[i][3] = vertex[3] / max_len
+    --     end
+    -- end
+
+    -- create the mesh object
     local vertexFormat = {
         {"VertexPosition", "float", 3},
         {"VertexColor", "float", 4},
         {"VertexNormal", "float", 3},
+        {"VertexTexCoord", "float", 2},
     }
     self.mesh = love.graphics.newMesh(vertexFormat, vertices, "triangles", "static")
     self.mesh:setVertexMap(indices)
