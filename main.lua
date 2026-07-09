@@ -1,10 +1,8 @@
 ---@diagnostic disable: duplicate-set-field
 local Vec2 = require("src.libs.vec2")
-local Vec3 = require("src.libs.vec3")
 local Benchmarker = require("src.libs.benchmarker")
 local ecs = require("src.libs.ecs")
 local comp = require("src.components")
-local Model = require("src.3d_model")
 local shaders = require("src.shaders")
 local world = require("src.world")
 local systems = require("src.systems")
@@ -13,7 +11,6 @@ local Color = require("src.color")
 local commons = require("src.libs.commons")
 local fonts = require("src.fonts")
 local palettes = require("src.palettes")
-local mmath = require("src.libs.mmath")
 local menu = require("src.menu")
 
 ---------------------------------------------------------------------
@@ -66,14 +63,6 @@ function love.load()
     palettes:send(shaders.palette, palettes.list[config.cm.palette_index])
 end
 
-local model = Model:new({
-    obj_path = "res/models/sword.obj",
-    ortho_size = 40,
-    center = Vec3:new(600, 600),
-    angle = Vec3:new(0, 0, 0),
-    avel = Vec3:new(0.9, 0.2, 2.3),
-    points = Color.NAVY,
-})
 local imgui_area = {0, 0, 160, HEIGHT}
 
 function love.update(dt)
@@ -92,9 +81,8 @@ function love.update(dt)
     end
 
     -- update the UI elements
-    model:update(dt)
     if current_menu ~= nil then
-        local closed = current_menu:update()
+        local closed = current_menu:update(dt)
         if closed then
             current_menu = nil
         end
@@ -164,6 +152,8 @@ function love.draw()
     love.graphics.setShader(shader)
     world:prepare_lighting_shader(systems._singletons.scroll)  -- sends data to shader including: light texture, offsets
     love.graphics.draw(canvas.lighting, 0, 0)
+    love.graphics.setCanvas(nil)
+    love.graphics.setShader(nil)
 
     -- =================================================================
     -- canvas.main RENDERING -> MAIN WINDOW
@@ -178,28 +168,19 @@ function love.draw()
     bench:start("palette", Color.PINK)
     love.graphics.draw(canvas.main, 0, 0)
     bench:finish("palette")
+    love.graphics.setShader(nil)
 
     -- =================================================================
     -- 3D MODEL > canvas.deep -> MAIN WINDOW
     -- =================================================================
-    love.graphics.setCanvas({canvas.deep, depth = true})
-    love.graphics.setShader(shaders.model)
-    love.graphics.clear(true, true, true)
-    love.graphics.setDepthMode("lequal", true)
-
-    shaders.model:send("uModel", mmath.mat4_transpose(model.model))
-    shaders.model:send("uView",  mmath.mat4_transpose(model.view))
-    shaders.model:send("uProj",  mmath.mat4_transpose(model.proj))
-
-    love.graphics.draw(model.mesh)
-
-    -- model -> main window
-    love.graphics.setShader()
-    love.graphics.setDepthMode()
+    -- render the current menu
+    if current_menu ~= nil then
+        current_menu:draw()
+    end
+    if current_menu ~= nil and current_menu.draw_model ~= nil then
+        current_menu:draw_model()
+    end
     love.graphics.setCanvas(nil)
-    local sx = love.graphics.getWidth() / canvas.deep:getWidth()
-    local sy = love.graphics.getHeight() / canvas.deep:getHeight()
-    love.graphics.draw(canvas.deep, 0, 0, 0, sx, sy)
 
     -- =================================================================
     -- UI RENDERING
@@ -208,11 +189,6 @@ function love.draw()
     bench:draw()
     systems.imgui.process(imgui_area)
     systems.inventory_ui.process(processed_chunks)
-
-    -- render the current menu
-    if current_menu ~= nil then
-        current_menu:draw()
-    end
 
     -- =================================================================
     -- POSTCONDITIONS

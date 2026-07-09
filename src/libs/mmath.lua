@@ -94,6 +94,16 @@ function mmath.mat4_rotateX(a)
     }
 end
 
+function mmath.mat4_rotateZ(a)
+    local c, s = math.cos(a), math.sin(a)
+    return {
+        c, s, 0, 0,
+       -s, c, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1
+    }
+end
+
 -- Converts column-major flat array to row-major format required by love.graphics.newShader:send()
 function mmath.mat4_transpose(m)
     return {

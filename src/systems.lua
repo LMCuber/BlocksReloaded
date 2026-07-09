@@ -38,7 +38,8 @@ local systems = {
     _singletons = {
         fake_scroll = Vec2:new(0, 0),
         scroll = Vec2:new(0, 0),
-        mouse = {x = nil, y = nil},
+        mouse = {x = 0, y = 0},
+        mouse_rel = {x = 0, y = 0, buffer_x = 0, buffer_y = 0},
         buttons = {
             [Button.LEFT]    = default_key_data(),
             [Button.RIGHT]   = default_key_data(),
@@ -80,6 +81,11 @@ local systems = {
 
 }
 local sg = systems._singletons
+
+function love.mousemoved(_, _, dx, dy, _)
+    sg.mouse_rel.buffer_x = dx
+    sg.mouse_rel.buffer_y = dy
+end
 
 function love.wheelmoved(x, y)
     sg.wheels.buffer_x = x
@@ -571,9 +577,9 @@ function systems.editing.process(chunks, world, current_menu)
     return new_menu
 end
 
-
 -- if there is an event, the buffer gets set to 1
 -- init uses the buffer value as current, BUT erases it (so next iteration uses an empty buffer value as current)
+-- (MUST be called FIRST in main loop, NOT LAST)
 function systems.singletons.process(dead_zone)
     -- get mouse position
     local _x, _y = love.mouse.getPosition()
@@ -626,11 +632,15 @@ function systems.singletons.process(dead_zone)
     -- reset all previous frame's dead zones
     sg.dead_zone = dead_zone
 
-    -- resets up some variables (must be called FIRST in main loop, NOT LAST)
+    -- update relative movements
     sg.wheels.x = sg.wheels.buffer_x
     sg.wheels.y = sg.wheels.buffer_y
     sg.wheels.buffer_x = 0
     sg.wheels.buffer_y = 0
+    sg.mouse_rel.x = sg.mouse_rel.buffer_x
+    sg.mouse_rel.y = sg.mouse_rel.buffer_y
+    sg.mouse_rel.buffer_x = 0
+    sg.mouse_rel.buffer_y = 0
 end
 
 function systems.late_rects.process()

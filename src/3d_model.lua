@@ -226,6 +226,7 @@ function Model:update(dt)
     local pos_y = (1 - (self.center.y / h) * 2) * self.ortho_size
 
     local rotation = mmath.mat4_multiply(mmath.mat4_rotateY(self.angle.y), mmath.mat4_rotateX(self.angle.x))
+    rotation = mmath.mat4_multiply(rotation, mmath.mat4_rotateZ(self.angle.z))
     self.model = mmath.mat4_multiply(mmath.mat4_translate(pos_x, pos_y, 0), rotation)
     self.view = mmath.mat4_lookAt({0, 0, 12}, {0, 0, 0}, {0, 1, 0})
 
