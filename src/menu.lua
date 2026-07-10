@@ -23,8 +23,8 @@ function menu.Anvil:new()
     return setmetatable({
         rect = {love.graphics.getWidth() / 2 - w / 2, love.graphics.getHeight() / 2 - h / 2, w, h},
         model = Model:new({
-            obj_path = "res/models/katana.obj",
-            ortho_size = 32,
+            obj_path = "res/models/hammer.obj",
+            ortho_size = 10,
             center = Vec3:new(love.graphics.getWidth() / 2 - 60, love.graphics.getHeight() / 2 - 40),
             angle = Vec3:new(0, 0, -math.pi / 2.5),
             avel = Vec3:new(0, 0, 0),
