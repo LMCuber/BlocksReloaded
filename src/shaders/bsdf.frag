@@ -2,7 +2,7 @@
 
 uniform vec3 uLightPosView = vec3(0, 0, 0);
 uniform vec3 uSpecularColor = vec3(1.0);
-uniform float uShininess = 32.0; // Added shininess exponent (higher = sharper highlight)
+uniform float uShininess = 32.0; // shininess exponent (higher = sharper)
 
 in vec3 vNormalView;  // the normal vector of this fragment
 in vec3 vPositionView; // we will need the view-space position to calculate the view vector
@@ -13,7 +13,7 @@ vec4 effect(vec4 color, Image tex, vec2 texture_coords, vec2 screen_coords)
     vec3 N = normalize(vNormalView);
     // normalized vector from the vertex position -> light
     vec3 L = normalize(uLightPosView - vPositionView);
-    // in view space, the camera is at (0 ,0, 0), so the direction to the camera is just -position
+    // in view space, the camera is at (0, 0, 0), so the direction to the camera is just -position
     // (Flipped back-to-front depending on your winding logic, but standard view space is -vPositionView)
     vec3 V = normalize(-vPositionView);
     // the half vector for Blinn-Phong

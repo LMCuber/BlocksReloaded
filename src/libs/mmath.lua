@@ -4,6 +4,15 @@ function mmath.mat4_identity()
     return {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1}
 end
 
+function mmath.mat4_scale(sx, sy, sz)
+    return {
+        sx, 0,  0,  0,
+        0,  sy, 0,  0,
+        0,  0,  sz, 0,
+        0,  0,  0,  1
+    }
+end
+
 function mmath.mat4_multiply(a, b)
     local r = {}
     for col = 0, 3 do

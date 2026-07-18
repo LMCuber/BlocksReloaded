@@ -13,11 +13,17 @@ function Model:new(kwargs)
     -- mandatory arguments
     obj.obj_path = kwargs.obj_path
     obj.center = kwargs.center
-    obj.ortho_size = kwargs.ortho_size
+    obj.ortho_size = 12
 
     -- optional arguments
     obj.angle = kwargs.angle or Vec3:new(0.0, 0.0, 0.0)
     obj.avel = kwargs.avel or Vec3:new(2.0, 2.0, 2.0)
+
+    -- scale factor applied at render time (after normalization).
+    -- defaults to ortho_size so normalized (unit-sphere) models scale
+    -- naturally with the orthographic view extent.
+    obj.scale = kwargs.scale or obj.ortho_size
+
     obj:update(1)
     obj.points = kwargs.color or nil
     obj.kwargs = kwargs
@@ -206,7 +212,9 @@ function Model:load_obj()
         ::continue::
     end
 
-    -- normalize all the vertices
+    -- normalize all the vertices so every model fits inside a unit sphere,
+    -- regardless of the original .obj file's scale. actual on-screen size
+    -- is then controlled separately via self.scale in the model matrix.
     local max_len = 0
     for _, vertex_pos in ipairs(unique_vertices) do
         local len = math.sqrt(vertex_pos[1] ^ 2 + vertex_pos[2] ^ 2 + vertex_pos[3] ^ 2)
@@ -215,14 +223,14 @@ function Model:load_obj()
         end
     end
 
-    -- if max_len > 0 then
-    --     -- change the already created vertices in their final array instead of constructing this array again
-    --     for i, vertex in ipairs(vertices) do
-    --         vertices[i][1] = vertex[1] / max_len
-    --         vertices[i][2] = vertex[2] / max_len
-    --         vertices[i][3] = vertex[3] / max_len
-    --     end
-    -- end
+    if max_len > 0 then
+        -- change the already created vertices in their final array instead of constructing this array again
+        for i, vertex in ipairs(vertices) do
+            vertices[i][1] = vertex[1] / max_len
+            vertices[i][2] = vertex[2] / max_len
+            vertices[i][3] = vertex[3] / max_len
+        end
+    end
 
     -- create the mesh object
     local vertexFormat = {
@@ -246,7 +254,12 @@ function Model:update(dt)
 
     local rotation = mmath.mat4_multiply(mmath.mat4_rotateY(self.angle.y), mmath.mat4_rotateX(self.angle.x))
     rotation = mmath.mat4_multiply(rotation, mmath.mat4_rotateZ(self.angle.z))
-    self.model = mmath.mat4_multiply(mmath.mat4_translate(pos_x, pos_y, 0), rotation)
+
+    -- apply the scale factor (default: ortho_size) before rotation & translation
+    local scale_mat = mmath.mat4_scale(self.scale, self.scale, self.scale)
+    local rot_scale = mmath.mat4_multiply(rotation, scale_mat)
+
+    self.model = mmath.mat4_multiply(mmath.mat4_translate(pos_x, pos_y, 0), rot_scale)
     self.view = mmath.mat4_lookAt({0, 0, 12}, {0, 0, 0}, {0, 1, 0})
 
     self.proj = mmath.mat4_ortho(
