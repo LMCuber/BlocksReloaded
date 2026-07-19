@@ -1,7 +1,7 @@
 local palettes = {
     list = {
         "2000", "31", "dusted_sunset",
-        "gun", "redorb", "rust_gold", "twilight", "pancakes"
+        "gun", "redorb", "rust_gold", "twilight", "pancakes", "apollo"
     }
 }
 
