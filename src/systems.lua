@@ -478,7 +478,7 @@ function systems.inventory_ui.process(chunks)
             -- react to mouse wheel input if is controllable
             local ctrl = ecs.try_component(ent_id, comp.Controllable)
             if ctrl then
-                local inc = sg.wheels.y
+                local inc = -sg.wheels.y
                 inv.index = inv.index + inc
                 inv.index = math.max(math.min(inv.index, #inv.items), 1)
             end
