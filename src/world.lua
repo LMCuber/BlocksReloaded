@@ -82,9 +82,6 @@ function World:place_structure(structure, cx, cy, x, y)
     end
 end
 
-function World:process_keypress(key)
-end
-
 function World:octave_noise(args)
     args = args or {}
 
@@ -659,7 +656,7 @@ function World:propagate_lighting(scroll)
         -- LIGHT IS STORED IN THE RED CHANNEL!
         if lx < map_w and ly < map_h then
             local val = lightmap[i] / MAX_LIGHT
-            self.light_data:setPixel(lx, ly, val, 0, 0, 1)
+            self.light_data:setPixel(lx, ly, val, val, val, 1)
         end
     end
     self.light_tex:replacePixels(self.light_data)

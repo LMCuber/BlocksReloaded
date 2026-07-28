@@ -17,6 +17,7 @@ local menu = require("src.menu")
 
 _G.bench = Benchmarker:new(200)
 _G.debug_info = {}
+local sg = systems._singletons
 
 ---------------------------------------------------------------------
 
@@ -40,13 +41,6 @@ local current_menu = nil
 
 ---------------------------------------------------------------------
 
-function love.keypressed(key)
-    if key == "escape" then
-        love.event.quit()
-    end
-    world:process_keypress(key)
-end
-
 function love.load()
     local deep_scale = 1
     _G.canvas = {
@@ -69,7 +63,7 @@ function love.update(dt)
     _G.debug_info = {}
     _G.dt = dt
 
-    processed_chunks = world:update(dt, systems._singletons.scroll)
+    processed_chunks = world:update(dt, sg.scroll)
 
     systems.singletons.process(imgui_area)
 
@@ -116,7 +110,7 @@ function love.draw()
     love.graphics.push()
 
     systems.camera.process(processed_chunks)
-    world:draw(systems._singletons.scroll)
+    world:draw(sg.scroll)
 
     -- render chunk border rectangles (visual)
     if config.cb.borders then
@@ -133,10 +127,10 @@ function love.draw()
 
     systems.late_rects.process()
 
-    -- =================================================================
-    -- 2D CAMERA ENDS HERE!
-    -- =================================================================
     love.graphics.pop()
+    -- =================================================================
+    -- 2D CAMERA ENDED!
+    -- =================================================================
     systems.process_misc_draw_systems(processed_chunks)
 
     -- =================================================================
@@ -150,7 +144,7 @@ function love.draw()
         shader = config.cb.palette and shaders.palette or nil
     end
     love.graphics.setShader(shader)
-    world:prepare_lighting_shader(systems._singletons.scroll)  -- sends data to shader including: light texture, offsets
+    world:prepare_lighting_shader(sg.scroll)  -- sends data to shader including: light texture, offsets
     love.graphics.draw(canvas.lighting, 0, 0)
     love.graphics.setCanvas(nil)
     love.graphics.setShader(nil)
@@ -189,6 +183,10 @@ function love.draw()
     bench:draw()
     systems.imgui.process(imgui_area)
     systems.inventory_ui.process(processed_chunks)
+
+    if sg.keys["escape"].clicked and not sg.keys["escape"].consumed then
+        love.event.quit()
+    end
 
     -- =================================================================
     -- POSTCONDITIONS

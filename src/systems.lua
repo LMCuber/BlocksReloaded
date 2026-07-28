@@ -26,7 +26,7 @@ local joystick = ecs.singletons.joystick
 -- =================================================================
 -- buttons: down, clicked, released, consumed (defualt_key_data)
 -- keys:    defualt_key_data
--- wheels:  clicked
+-- wheels:  x, y, buffer_x, buffer_y, consumed
 -- =================================================================
 local function default_key_data()
     -- return entirely composed of off states
@@ -54,8 +54,8 @@ local systems = {
             [Button.MOUSE_4] = default_key_data(),
             [Button.MOUSE_5] = default_key_data(),
         },
-        keys = {},
-        wheels = {x = 0, y = 0, buffer_x = 0, buffer_y = 0},
+        keys = {},  -- will be populated a few lines below
+        wheels = {x = 0, y = 0, buffer_x = 0, buffer_y = 0, consumed = false},
         late_rects = {},
         dead_zone = nil
     },
@@ -92,10 +92,15 @@ function love.wheelmoved(x, y)
     sg.wheels.buffer_y = y
 end
 
--- keyboard map
+-- populate the keys in the map
 local alphabet = "abcdefghijklmnopqrstuvwxyz"
 for i = 1, #alphabet do
     local char = alphabet:sub(i, i)
+    sg.keys[char] = default_key_data()
+end
+local specials = {"escape", "return", "tab"}
+for i = 1, #specials do
+    local char = specials[i]
     sg.keys[char] = default_key_data()
 end
 
@@ -478,7 +483,7 @@ function systems.inventory_ui.process(chunks)
             -- react to mouse wheel input if is controllable
             local ctrl = ecs.try_component(ent_id, comp.Controllable)
             if ctrl then
-                local inc = -sg.wheels.y
+                local inc = sg.wheels.y
                 inv.index = inv.index + inc
                 inv.index = math.max(math.min(inv.index, #inv.items), 1)
             end
@@ -577,9 +582,9 @@ function systems.editing.process(chunks, world, current_menu)
     return new_menu
 end
 
--- if there is an event, the buffer gets set to 1
--- init uses the buffer value as current, BUT erases it (so next iteration uses an empty buffer value as current)
--- (MUST be called FIRST in main loop, NOT LAST)
+-- If there is an event, the buffer gets set to 1 before this function is called.
+-- `process` uses the buffer value as current, BUT erases it (so next iteration uses an empty buffer as their current value)
+-- must be called FIRST in main loop
 function systems.singletons.process(dead_zone)
     -- get mouse position
     local _x, _y = love.mouse.getPosition()
@@ -599,6 +604,7 @@ function systems.singletons.process(dead_zone)
 
     -- all buttons bypassing the dead zone (raw buttons)
     for button_id, state in pairs(sg.raw_buttons) do
+        state.consumed = false
         local is_down = love.mouse.isDown(button_id)  -- e.g. 1 or 3
         state.clicked = is_down and not state.down
         state.released = not is_down and state.down
@@ -606,8 +612,9 @@ function systems.singletons.process(dead_zone)
         state.down = is_down
     end
 
-    -- all keyboard unput
+    -- update all keyboard input
     for key, state in pairs(sg.keys) do
+        state.consumed = false
         local is_down = love.keyboard.isDown(key)
         state.clicked = is_down and not state.down
         state.released = not is_down and state.down
@@ -617,6 +624,7 @@ function systems.singletons.process(dead_zone)
 
     -- joystick BUTTON input
     for btn_id, state in pairs(joystick.buttons) do
+        state.consumed = false
         local is_down = joystick.current:isDown(btn_id)
         state.clicked = is_down and not state.down
         state.released = not is_down and state.down
@@ -632,7 +640,7 @@ function systems.singletons.process(dead_zone)
     -- reset all previous frame's dead zones
     sg.dead_zone = dead_zone
 
-    -- update relative movements
+    -- update relative movements using the aforementioned buffer system
     sg.wheels.x = sg.wheels.buffer_x
     sg.wheels.y = sg.wheels.buffer_y
     sg.wheels.buffer_x = 0

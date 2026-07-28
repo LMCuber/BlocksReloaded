@@ -58,7 +58,7 @@ function Benchmarker:draw()
             love.graphics.setColor(Color.WHITE)
             local x, y = love.mouse.getPosition()
             love.graphics.setFont(fonts.orbitron[14])
-            love.graphics.print(key, x - 20, y + 40)
+            love.graphics.print(key .. ": " .. time, x - 20, y + 40)
         end
 
         total_w = total_w + w

@@ -34,10 +34,17 @@ function menu.Anvil:new()
 end
 
 function menu.Anvil:update(dt)
+    -- RETURNS: whether should close or not (bool)
+
     local sg = systems._singletons
 
     -- return whether should close
     local closed = false
+
+    if sg.keys["escape"].clicked and not sg.keys["escape"].consumed then
+        closed = true
+        sg.keys["escape"].consumed = true
+    end
 
     if sg.buttons[Button.LEFT].clicked and not sg.buttons[Button.LEFT].consumed then
         -- click out of the rectangle

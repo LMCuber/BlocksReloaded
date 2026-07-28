@@ -22,6 +22,5 @@ vec4 effect(vec4 color, Image texture, vec2 texture_coords, vec2 screen_coords) 
     // 5. Sample and multiply
     vec4 light = Texel(LightMap, lightUV);
     
-    // We only use the Red channel (where we stored the light)
-    return pixel * vec4(light.r, light.r, light.r, 1.0);
+    return pixel * vec4(light.rgb, 1.0);
 }
