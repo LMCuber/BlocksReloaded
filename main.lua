@@ -1,7 +1,7 @@
 ---@diagnostic disable: duplicate-set-field
 local Vec2 = require("src.libs.vec2")
 local Benchmarker = require("src.libs.benchmarker")
-local ecs = require("src.libs.ecs")
+local engine = require("src.libs.engine")
 local comp = require("src.components")
 local shaders = require("src.shaders")
 local world = require("src.world")
@@ -18,10 +18,11 @@ local menu = require("src.menu")
 _G.bench = Benchmarker:new(200)
 _G.debug_info = {}
 local sg = systems._singletons
+local state = engine.state
 
 ---------------------------------------------------------------------
 
-ecs.create_entity(
+engine.ecs.create_entity(
     0, 0,
     comp.Transform:new(
         Vec2:new(400, 400),
@@ -36,7 +37,6 @@ ecs.create_entity(
 )
 
 local processed_chunks = {}
-local player_skins = {"dexter", "samurai"}
 local current_menu = nil
 
 ---------------------------------------------------------------------
@@ -63,6 +63,8 @@ function love.update(dt)
     _G.debug_info = {}
     _G.dt = dt
 
+    engine.preupdate()
+
     processed_chunks = world:update(dt, sg.scroll)
 
     systems.singletons.process(imgui_area)
@@ -75,17 +77,13 @@ function love.update(dt)
     end
 
     -- update the UI elements
-    if current_menu ~= nil then
-        local closed = current_menu:update(dt)
-        if closed then
-            current_menu = nil
-        end
+    if state.get(menu.state) ~= menu.state.NONE then
+        menu.current:update(dt, sg)
     end
 
-    -- update the editing (and get new model potentially)
-    local new_menu = systems.editing.process(processed_chunks, world)
-    if new_menu ~= nil then
-        current_menu = menu.new_menu(new_menu)
+    -- update the editing system
+    if state.get(menu.state) == menu.state.NONE then
+        systems.editing.process(processed_chunks, world)
     end
 
     -- misc system updates
@@ -168,11 +166,11 @@ function love.draw()
     -- 3D MODEL > canvas.deep -> MAIN WINDOW
     -- =================================================================
     -- render the current menu
-    if current_menu ~= nil then
-        current_menu:draw()
-    end
-    if current_menu ~= nil and current_menu.draw_model ~= nil then
-        current_menu:draw_model()
+    if state.get(menu.state) ~= menu.state.NONE then
+        menu.current:draw()
+        if menu.current.draw_model ~= nil then
+            menu.current:draw_model()
+        end
     end
     love.graphics.setCanvas(nil)
 

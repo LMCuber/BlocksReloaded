@@ -1,21 +1,23 @@
 local Color = require("src.color")
-local systems = require("src.systems")
 local commons = require("src.libs.commons")
 local shaders = require("src.shaders")
 local mmath = require("src.libs.mmath")
 local Model = require("src.3d_model")
 local Vec3 = require("src.libs.vec3")
+local engine = require("src.libs.engine")
 
-local menu = {}
+local menu = {current = nil}
+
+menu.state = {NONE = 1, ANVIL = 2}
+engine.state.register(menu.state, menu.state.NONE)
+engine.state.callback(menu.state, function (new_state)
+    if new_state == menu.state.ANVIL then
+        menu.current = menu.Anvil:new()
+    end
+end)
 
 menu.Anvil = {}
 menu.Anvil.__index = menu.Anvil
-
-function menu.new_menu(type)
-    if type == "anvil" then
-        return menu.Anvil:new()
-    end
-end
 
 function menu.Anvil:new()
     local w = 260
@@ -33,32 +35,24 @@ function menu.Anvil:new()
     }, self)
 end
 
-function menu.Anvil:update(dt)
-    -- RETURNS: whether should close or not (bool)
-
-    local sg = systems._singletons
-
-    -- return whether should close
+function menu.Anvil:update(dt, input)  -- depencency inversion for input
+    -- keep track whether should close this menu when function finishes
     local closed = false
 
-    if sg.keys["escape"].clicked and not sg.keys["escape"].consumed then
+    if input.keys["escape"].clicked then
         closed = true
-        sg.keys["escape"].consumed = true
     end
 
-    if sg.buttons[Button.LEFT].clicked and not sg.buttons[Button.LEFT].consumed then
+    if input.buttons[Button.LEFT].clicked then
         -- click out of the rectangle
         if not commons.collidepointmouse(commons.unpack(self.rect)) then
             closed = true
         end
-
-        -- since we operated on the button press, we need to report that we consumed it
-        sg.buttons[Button.LEFT].consumed = true
     end
 
     -- rotate the model based on mouse input
-    local dx, dy = sg.mouse_rel.x, sg.mouse_rel.y
-    if sg.buttons[Button.LEFT].down then
+    local dx, dy = input.mouse_rel.x, input.mouse_rel.y
+    if input.buttons[Button.LEFT].down then
         local m = 0.01
         self.model.avel = Vec3:new(0, 0, 0)
         self.model.angle.y = self.model.angle.y + dx * m
@@ -71,7 +65,9 @@ function menu.Anvil:update(dt)
     -- update the model
     self.model:update(dt)
 
-    return closed
+    if closed then
+        engine.state.set_next(menu.state, menu.state.NONE)
+    end
 end
 
 function menu.Anvil:draw()

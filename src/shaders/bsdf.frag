@@ -23,11 +23,10 @@ vec4 effect(vec4 color, Image tex, vec2 texture_coords, vec2 screen_coords)
     float dotNL = max(dot(N, L), 0.0);
     vec3 diffuse = color.rgb * mix(0.35, 1.0, dotNL);  // makes sure no point is in COMPLETE darkness
 
-    // specular term (Blinn-Phong using the half-vector H)
+    // specular term
     float dotNH = max(dot(N, H), 0.0);
     float specularIntensity = pow(dotNH, uShininess);
     
-    // Only apply specular highlights if the surface is actually facing the light source
     vec3 specular = uSpecularColor * specularIntensity * (dotNL > 0.0 ? 1.0 : 0.0);
 
     // combine them

@@ -3,7 +3,7 @@ local Color = require("src.color")
 -- 
 local blocks = require("src.blocks")
 local biomes = require("src.biome")
-local ecs = require("src.libs.ecs")
+local engine = require("src.libs.engine")
 local comp = require("src.components")
 local systems = require("src.systems")
 local yaml = require("src.libs.yaml")
@@ -385,7 +385,7 @@ function World:modify_chunk(cx, cy)
                 -- entities
                 if chance(1 / 20) then
                     for i = 1, 1 do
-                        ecs.create_entity(
+                        engine.ecs.create_entity(
                             cx, cy,
                             comp.Transform:new(
                                 Vec2:new(abs_x * BS, (abs_y - 7 - i) * BS),
@@ -400,7 +400,7 @@ function World:modify_chunk(cx, cy)
 
                 if chance(1 / 1000000) then
                     for _ = 1, 5 do
-                        ecs.create_entity(
+                        engine.ecs.create_entity(
                             cx, cy,
                             comp.Transform:new(
                                 Vec2:new(abs_x * BS, (abs_y - 7) * BS),
@@ -414,7 +414,7 @@ function World:modify_chunk(cx, cy)
                 end
 
                 if chance(1 / 1000) then
-                    ecs.create_entity(
+                    engine.ecs.create_entity(
                         cx, cy,
                         comp.Transform:new(
                             Vec2:new(abs_x * BS, (abs_y - 3) * BS),

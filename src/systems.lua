@@ -1,5 +1,6 @@
 ---@diagnostic disable: need-check-nil
-local ecs = require("src.libs.ecs")
+local engine = require("src.libs.engine")
+local ecs = engine.ecs
 local commons = require("src.libs.commons")
 local Vec2 = require("src.libs.vec2")
 --
@@ -12,6 +13,7 @@ local imgui = require("src.libs.imgui")
 local config = require("src.config")
 local palettes = require("src.palettes")
 local shaders = require("src.shaders")
+local menu = require("src.menu")
 
 _G.Button = {
     LEFT = 1,
@@ -493,11 +495,10 @@ function systems.inventory_ui.process(chunks)
     love.graphics.draw(inv_batch)
 end
 
-function systems.editing.process(chunks, world, current_menu)
+function systems.editing.process(chunks, world)
     local Intent = comp.Intent
-    local new_menu = nil
 
-    -- controllable + inventory means editing for now
+    -- controllable + inventory *semantically* means that the entity can edit (might be subject to change)
     for _, entry in ipairs(ecs.get_components(chunks, comp.Inventory, comp.Controllable)) do
         local ent_id, _, _, inv, ctrl = commons.unpack(entry)
 
@@ -511,10 +512,12 @@ function systems.editing.process(chunks, world, current_menu)
         local rect_y = (cy * CH + ry - 1) * BS
         table.insert(sg.late_rects, {rect_x, rect_y, BS, BS, Color.ORANGE})
 
-        -- check right click causing some other action
+        -- check right click causing some 'interaction'
         if sg.buttons[Button.RIGHT].clicked then
             if bwand(current, BF.MENU) then
-                new_menu = current
+                if current == "anvil" then
+                    engine.state.set_next(menu.state, menu.state.ANVIL)
+                end
             end
         end
 
@@ -578,8 +581,6 @@ function systems.editing.process(chunks, world, current_menu)
             end
         end
     end
-
-    return new_menu
 end
 
 -- If there is an event, the buffer gets set to 1 before this function is called.
