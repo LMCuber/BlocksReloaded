@@ -9,6 +9,7 @@ local systems = require("src.systems")
 local yaml = require("src.libs.yaml")
 local config = require("src.config")
 local shaders = require("src.shaders")
+local ffi = require("ffi")
 
 -- constants
 local VIEW_PADDING = MAX_LIGHT + 1
@@ -554,6 +555,7 @@ function World:get_processed_chunks(scroll)  -- side effect: updates self.proces
 end
 
 local qx, qy, ql, qd = {}, {}, {}, {}   -- x, y, light, decay
+local uint8_ptr_t = ffi.typeof("uint8_t*")
 
 function World:propagate_lighting(scroll)
     self.light_frame = self.light_frame + 1
@@ -578,40 +580,68 @@ function World:propagate_lighting(scroll)
     self.lightmap_h = map_h
     self.lightmap_min_x = min_x
     self.lightmap_min_y = min_y
-    self.lightmap1d = self.lightmap1d or {}  -- seems to speed up but I don't know why. I assume because some lighting can remain the same?
+    self.lightmap1d = self.lightmap1d or {}  -- seems to speed up but I don't know why. I assume because some lighting can remain the same as last?
     local lightmap = self.lightmap1d
     local light_data = blocks.light_data
     local head, tail = 1, 0
 
     -- lightmap data
-    self.light_data = love.image.newImageData(map_w, map_h)
-    self.light_data = love.image.newImageData(map_w, map_h)
-    self.light_tex = love.graphics.newImage(self.light_data)
-    self.light_tex:setFilter("linear", "linear")
+    if not self.light_tex or self.lightmap_w ~= map_w or self.lightmap_h ~= map_h then
+        -- only create the light data and texture if none exists OR the size changed for some reason
+        self.light_data = love.image.newImageData(map_w, map_h)
+        self.light_tex = love.graphics.newImage(self.light_data)
+        self.light_tex:setFilter("linear", "linear")
+    end
 
     -- initialize lightmap from known light sources
+    local block_name = blocks.name
+    local data = self.data
+    local bg_data = self.bg_data
+
     for ty = min_y, max_y do
         local y_offset = (ty - min_y) * map_w
-        for tx = min_x, max_x do
+        local cy = math.floor(ty / CH)
+        local ry = (ty % CH) + 1
+
+        local tx = min_x
+        local cx = math.floor(tx / CW)
+        local rx = (tx % CW) + 1
+        local col = data[cx]
+        local chunk = col and col[cy]
+        local bg_col = bg_data[cx]
+        local bg_chunk = bg_col and bg_col[cy]
+
+        while tx <= max_x do
             local idx = y_offset + (tx - min_x) + 1
 
-            local tile = self:abs_pos_to_tile(tx, ty, true)
-            local bg_tile = self:abs_pos_to_bg_tile(tx, ty, true)
+            local rcol = chunk and chunk[rx]
+            local tile = rcol and rcol[ry]
+            local bg_rcol = bg_chunk and bg_chunk[rx]
+            local bg_tile = bg_rcol and bg_rcol[ry]
 
-            local name = blocks.name[tile]
-            local bg_name = blocks.name[bg_tile]
+            local name = block_name[tile]
+            local bg_name = block_name[bg_tile]
             local ld = light_data[name]
 
             if (name == "air" and bg_name == "air") or (name ~= "air" and bwand(name, BF.LIGHT_SOURCE)) then
                 local lv = ld and ld.strength or MAX_LIGHT
-                -- Decay of 1 is standard for "spreading"
                 local d = ld and ld.decay or 1
-
                 lightmap[idx] = lv
                 tail = tail + 1
                 qx[tail], qy[tail], ql[tail], qd[tail] = tx, ty, lv, d
             else
                 lightmap[idx] = 0
+            end
+
+            tx = tx + 1
+            rx = rx + 1
+            if rx > CW then
+                rx = 1
+                cx = cx + 1
+                col = data[cx]
+                chunk = col and col[cy]
+                bg_col = bg_data[cx]
+                bg_chunk = bg_col and bg_col[cy]
             end
         end
     end
@@ -649,16 +679,23 @@ function World:propagate_lighting(scroll)
         end
     end
 
-    -- put lightmap1d -> light_data
+    -- put lightmap1d -> light_data (via C FFI!)
+    local ptr = ffi.cast(uint8_ptr_t, self.light_data:getFFIPointer())
+    local inv_max = 255 / MAX_LIGHT  -- since val = light / MAX_LIGHT * 255 => val = light * (1 / MAX_LIGHT) * 255 => val = light * (255 / MAX_LIGHT)
+    local p = 0
     for i = 1, #lightmap do
-        local lx = (i - 1) % map_w
-        local ly = math.floor((i - 1) / map_w)
-        -- LIGHT IS STORED IN THE RED CHANNEL!
-        if lx < map_w and ly < map_h then
-            local val = lightmap[i] / MAX_LIGHT
-            self.light_data:setPixel(lx, ly, val, val, val, 1)
-        end
+        local val = lightmap[i] * inv_max
+
+        -- put the value inside the buffer
+        -- buffer accepts u8's (color is between 0 and 255! NOT 0 to 1!)
+        local b = val
+        ptr[p]     = b   -- R
+        ptr[p + 1] = b   -- G
+        ptr[p + 2] = b   -- B
+        ptr[p + 3] = 255 -- A
+        p = p + 4
     end
+
     self.light_tex:replacePixels(self.light_data)
 
     _G.debug_info["light steps"] = steps
@@ -692,13 +729,7 @@ function World:draw(scroll)
     local max_x = math.floor((scroll.x + WIDTH) / BS)
     local min_y = math.floor(scroll.y / BS)
     local max_y = math.floor((scroll.y + HEIGHT) / BS)
-    local size_x = max_x - min_x + 1
-    local size_y = max_y - min_y + 1
     local lighting_offset = Vec2:new(0, 0)
-
-    if config.cb.lighting then
-        self.light_surf = love.image.newImageData(size_x, size_y)
-    end
 
     if config.cb.blocks then
         bench:start("blocks", Color.GREEN)
@@ -712,7 +743,7 @@ function World:draw(scroll)
         local lx = self.lightmap_min_x
         local ly = self.lightmap_min_y
         for ty = min_y, max_y do
-            local y_offset = (ty - ly) * lw
+            -- local y_offset = (ty - ly) * lw
             local screen_y = ty * BS
 
             for tx = min_x, max_x do
@@ -722,11 +753,11 @@ function World:draw(scroll)
                 local name = blocks.name[tile]
                 local bg_name = blocks.name[bg_tile]
 
-                -- lightmap index for this block
-                local idx = y_offset + (tx - lx) + 1
+                -- -- lightmap index for this block
+                -- local idx = y_offset + (tx - lx) + 1
 
-                -- get light value
-                local light = self.lightmap1d[idx] or 0
+                -- -- get light value
+                -- local light = self.lightmap1d[idx] or 0
 
                 -- if there is foreground, draw that. Else, if background, draw that
                 if tile ~= nil and name ~= "air" then
@@ -763,17 +794,6 @@ function World:draw(scroll)
         num_rendered_entities, num_updated_entities = systems.render.process(self.processed_chunks)
         bench:finish("entities")
     end
-
-    -- render the lightmap (REGARDLESS of blocks render)
-    if config.cb.lighting then
-        -- calculate the lighting offset
-        lighting_offset.x = min_x * BS - scroll.x
-        lighting_offset.y = min_y * BS - scroll.y
-        self.light_surf = love.graphics.newImage(self.light_surf)
-        -- self.light_surf:setFilter("nearest", "nearest")
-        love.graphics.draw(self.light_surf, scroll.x + lighting_offset.x, scroll.y + lighting_offset.y, 0, BS, BS)
-    end
-    love.graphics.setColor(Color.WHITE)
 
     -- finish block rendering segment
     if config.cb.blocks then

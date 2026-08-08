@@ -54,14 +54,26 @@ function love.load()
     love.window.setIcon(icon)
     love.window.setVSync(config.cb.vsync)
 
+    -- love.profiler = require("src.libs.profile")
+    -- love.profiler.start()
+
     palettes:send(shaders.palette, palettes.list[config.cm.palette_index])
 end
 
 local imgui_area = {0, 0, 160, HEIGHT}
+love.frame = 0
 
 function love.update(dt)
+    -- frame updates
     _G.debug_info = {}
     _G.dt = dt
+
+    -- profiling
+    -- love.frame = love.frame + 1
+    -- if love.frame % 100 == 0 or true then
+    --     love.report = love.profiler.report(20)
+    --     love.profiler.reset()
+    -- end
 
     engine.preupdate()
 

@@ -1,5 +1,5 @@
-extern Image palette;
-extern float paletteSize;
+uniform Image palette;
+uniform float paletteSize;
 
 vec4 effect(vec4 color, Image tex, vec2 tc, vec2 sc) {
     vec4 pixel = Texel(tex, tc) * color;
@@ -12,8 +12,8 @@ vec4 effect(vec4 color, Image tex, vec2 tc, vec2 sc) {
         float u = (float(i) + 0.5) / paletteSize;
         vec3 paletteColor = Texel(palette, vec2(u, 0.5)).rgb;
 
-        vec3 diff = pixel.rgb - paletteColor;  // x and y diff of triangle;
-        float dist = dot(diff, diff);  // length since dot(v, v) ≡ |v|;
+        vec3 diff = pixel.rgb - paletteColor;
+        float dist = dot(diff, diff);  // length since dot(v, v) ≡ |v|^2;
 
         if (dist < minDist) {
             minDist = dist;

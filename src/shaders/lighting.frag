@@ -1,3 +1,5 @@
+// LLM CODE!
+
 extern Image LightMap;
 extern vec2 lightMapOffset; // worldTile min_x, min_y
 extern vec2 cameraPos;      // scroll.x / BS, scroll.y / BS

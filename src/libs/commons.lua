@@ -213,14 +213,6 @@ function commons.sum(tbl)
     return total
 end
 
-function commons.length(v)
-    local sum = 0
-    for i = 1, #v do
-        sum = sum + v[i] * v[i]
-    end
-    return math.sqrt(sum)
-end
-
 -- LLM
 function commons.collidepointmouse(rx, ry, rw, rh)
     local px, py = love.mouse.getPosition()

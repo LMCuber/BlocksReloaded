@@ -1,6 +1,6 @@
 local state = {
     states = {},
-    callbacks = {},
+    callbacks = {},  -- {enum: list of callbacks}
     next = nil,  -- tuple(enum, value)
 }
 
