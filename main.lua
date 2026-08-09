@@ -1,27 +1,28 @@
 ---@diagnostic disable: duplicate-set-field
 local Vec2 = require("src.libs.vec2")
-local Vec3 = require("src.libs.vec3")
 local Benchmarker = require("src.libs.benchmarker")
-local ecs = require("src.libs.ecs")
+local engine = require("src.libs.engine")
 local comp = require("src.components")
-local Model = require("src.3d_model")
 local shaders = require("src.shaders")
 local world = require("src.world")
 local systems = require("src.systems")
 local config = require("src.config")
-local math = require("math")
 local Color = require("src.color")
 local commons = require("src.libs.commons")
 local fonts = require("src.fonts")
+local palettes = require("src.palettes")
+local menu = require("src.menu")
 
 ---------------------------------------------------------------------
 
 _G.bench = Benchmarker:new(200)
 _G.debug_info = {}
+local sg = systems._singletons
+local state = engine.state
 
 ---------------------------------------------------------------------
 
-ecs.create_entity(
+engine.ecs.create_entity(
     0, 0,
     comp.Transform:new(
         Vec2:new(400, 400),
@@ -32,95 +33,97 @@ ecs.create_entity(
     comp.Hitbox:new(52, 80),  -- static hitbox
     comp.CameraAnchor:new(0.1),  -- camera follows its position
     comp.Controllable:new(),  -- can move using keyboard,
-    comp.Inventory:new({"torch", "torch", "supertorch"})  -- inventory to place blocks
+    comp.Inventory:new({"torch", "supertorch", "anvil"}, {10, 10, 3}, true)  -- inventory to place blocks
 )
 
 local processed_chunks = {}
-
-local o = 0.17 * math.pi
-local model = Model:new({
-    obj_path = "res/models/caucasus.obj",
-    center = Vec2:new(500, 300),
-    size = 30,
-    light = {0, -1, 0},
-    angle = Vec3:new(o, o, 0),
-    avel = Vec3:new(0.0, 0.7, 0),
-    -- points = Color.NAVY,
-})
+local current_menu = nil
 
 ---------------------------------------------------------------------
 
-function love.keypressed(key)
-    if key == "escape" then
-        love.event.quit()
-    end
-    world:process_keypress(key)
-end
-
 function love.load()
-    _G.CANVAS = love.graphics.newCanvas(love.graphics.getWidth(), love.graphics.getHeight())
+    local deep_scale = 1
+    _G.canvas = {
+        main = love.graphics.newCanvas(love.graphics.getWidth(), love.graphics.getHeight()),  -- penultimate canvas before blitting onto main window
+        deep = love.graphics.newCanvas(love.graphics.getWidth() / deep_scale, love.graphics.getHeight() / deep_scale),  -- canvas to be used with a depth field,
+        lighting = love.graphics.newCanvas(love.graphics.getWidth(), love.graphics.getHeight()),  -- when this canvas gets blitted onto next canvas, indermediately: lighting happens
+    }
+    canvas.deep:setFilter("nearest")
+
     local icon = love.image.newImageData("res/images/visuals/windows_icon.png")
     love.window.setIcon(icon)
-    love.window.setVSync(config.vsync)
+    love.window.setVSync(config.cb.vsync)
+
+    -- love.profiler = require("src.libs.profile")
+    -- love.profiler.start()
+
+    palettes:send(shaders.palette, palettes.list[config.cm.palette_index])
 end
 
--------
+local imgui_area = {0, 0, 160, HEIGHT}
+love.frame = 0
 
 function love.update(dt)
+    -- frame updates
     _G.debug_info = {}
     _G.dt = dt
 
-    processed_chunks = world:update(dt, systems._singletons.scroll)
+    -- profiling
+    -- love.frame = love.frame + 1
+    -- if love.frame % 100 == 0 or true then
+    --     love.report = love.profiler.report(20)
+    --     love.profiler.reset()
+    -- end
 
-    -- singletons first
-    systems.singletons.process()
+    engine.preupdate()
+
+    processed_chunks = world:update(dt, sg.scroll)
+
+    systems.singletons.process(imgui_area)
 
     -- other systems that don't just take processed_chunks as argument
-    if config.physics then
-        bench:start(Color.LIGHT_GRAY)
+    if config.cb.physics then
+        bench:start("physics", Color.LIGHT_GRAY)
         systems.physics.process(processed_chunks, world)
-        bench:finish(Color.LIGHT_GRAY, false)
+        bench:finish("physics", false)
     end
 
-    systems.editing.process(processed_chunks, world)
+    -- update the UI elements
+    if state.get(menu.state) ~= menu.state.NONE then
+        menu.current:update(dt, sg)
+    end
+
+    -- update the editing system
+    if state.get(menu.state) == menu.state.NONE then
+        systems.editing.process(processed_chunks, world)
+    end
+
+    -- misc system updates
     systems.controllable.process(processed_chunks, world)
     systems.process_misc_update_systems(processed_chunks)
-
-    bench:start(Color.RED)
-    model:update()
-    bench:finish(Color.RED)
-
-    -- shaders
-    shaders.sky:send("time", love.timer.getTime())
-    shaders.default:send("time", love.timer.getTime())
-    shaders.default:send("levels", 16);
 end
 
 ---------------------------------------------------------------------
 
 function love.draw()
-    -- DRAW EVERYHING ON AUXILIARY CANVAS
-    love.graphics.setCanvas(CANVAS)
-
-    -- reset the shader of the last frame
-    love.graphics.setShader()
-
-    -- background
-    if config.shaders then
-        love.graphics.setShader(shaders.sky)
-    end
+    -- =================================================================
+    -- SETUP
+    -- =================================================================
+    love.graphics.setCanvas(canvas.lighting)
+    love.graphics.setShader(nil)
     love.graphics.setColor({0.14, 0.12, 0.24})
     love.graphics.rectangle("fill", 0, 0, WIDTH, HEIGHT)
-    love.graphics.setShader()
 
-    -- ENTER: RENDERING WITH CAMERA SCROLL OFFSET
+    -- =================================================================
+    -- 2D CAMERA STARTED!
+    -- =================================================================
     love.graphics.push()
 
     systems.camera.process(processed_chunks)
-    world:draw(systems._singletons.scroll)
+    world:draw(sg.scroll)
 
     -- render chunk border rectangles (visual)
-    if config.borders then
+    if config.cb.borders then
         for _, chunk_key in ipairs(processed_chunks) do
             love.graphics.setColor(Color.CYAN)
             local cx, cy = commons.unpack(chunk_key)
@@ -132,28 +135,71 @@ function love.draw()
         end
     end
 
-    -- a batch of rectangles sent by the systems to render at once
     systems.late_rects.process()
+
+    love.graphics.pop()
+    -- =================================================================
+    -- 2D CAMERA ENDED!
+    -- =================================================================
     systems.process_misc_draw_systems(processed_chunks)
 
-    -- EXIT: OFFSETTED RENDERING. EVERYHING FROM HERE WILL BE RENDERED ABSOLUTELY
-    love.graphics.pop()
-
-    model:draw()
-
-    -- BLITTING CANVAS ONTO MAIN WINDOW
-    love.graphics.setCanvas()
-    -- apply lighting shader beforehand
-    love.graphics.setColor(Color.WHITE)
-    if config.lighting and world.light_tex then
-        world:prepare_lighting_shader(systems._singletons.scroll)  -- sends data to shader including: light texture, offsets
-        love.graphics.setShader(shaders.lighting)
+    -- =================================================================
+    -- LIGHTMAP RENDERING -> canvas.main
+    -- =================================================================
+    love.graphics.setCanvas(canvas.main)
+    local shader
+    if config.cb.chiaroscuro then
+        shader = config.cb.lighting and shaders.lighting or nil
+    else
+        shader = config.cb.palette and shaders.palette or nil
     end
-    love.graphics.draw(CANVAS, 0, 0)
-    love.graphics.setShader()
+    love.graphics.setShader(shader)
+    world:prepare_lighting_shader(sg.scroll)  -- sends data to shader including: light texture, offsets
+    love.graphics.draw(canvas.lighting, 0, 0)
+    love.graphics.setCanvas(nil)
+    love.graphics.setShader(nil)
 
-    -- POST-CANVAS
-    bench:draw(config.percent)
-    systems.imgui.process({0, 0, 160, HEIGHT})
-    love.graphics.setColor(Color.WHITE)
+    -- =================================================================
+    -- canvas.main RENDERING -> MAIN WINDOW
+    -- =================================================================
+    love.graphics.setCanvas(nil)
+    if config.cb.chiaroscuro then
+        shader = config.cb.palette and shaders.palette or nil
+    else
+        shader = config.cb.lighting and shaders.lighting or nil
+    end
+    love.graphics.setShader(shader)
+    bench:start("palette", Color.PINK)
+    love.graphics.draw(canvas.main, 0, 0)
+    bench:finish("palette")
+    love.graphics.setShader(nil)
+
+    -- =================================================================
+    -- 3D MODEL > canvas.deep -> MAIN WINDOW
+    -- =================================================================
+    -- render the current menu
+    if state.get(menu.state) ~= menu.state.NONE then
+        menu.current:draw()
+        if menu.current.draw_model ~= nil then
+            menu.current:draw_model()
+        end
+    end
+    love.graphics.setCanvas(nil)
+
+    -- =================================================================
+    -- UI RENDERING
+    -- =================================================================
+    love.graphics.setCanvas(nil)
+    bench:draw()
+    systems.imgui.process(imgui_area)
+    systems.inventory_ui.process(processed_chunks)
+
+    if sg.keys["escape"].clicked and not sg.keys["escape"].consumed then
+        love.event.quit()
+    end
+
+    -- =================================================================
+    -- POSTCONDITIONS
+    -- =================================================================
+    assert(love.graphics.getCanvas() == nil, "the final blit must be onto the global canvas")
 end

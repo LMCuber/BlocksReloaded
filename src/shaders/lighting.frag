@@ -1,3 +1,5 @@
+// LLM CODE!
+
 extern Image LightMap;
 extern vec2 lightMapOffset; // worldTile min_x, min_y
 extern vec2 cameraPos;      // scroll.x / BS, scroll.y / BS
@@ -22,6 +24,5 @@ vec4 effect(vec4 color, Image texture, vec2 texture_coords, vec2 screen_coords) 
     // 5. Sample and multiply
     vec4 light = Texel(LightMap, lightUV);
     
-    // We only use the Red channel (where we stored the light)
-    return pixel * vec4(light.r, light.r, light.r, 1.0);
+    return pixel * vec4(light.rgb, 1.0);
 }

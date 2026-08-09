@@ -15,6 +15,26 @@ function _G.iprint(tbl)
 end
 
 -- LLM code
+function commons.atan2(y, x)
+    if x > 0 then
+        return math.atan(y / x)
+    elseif x < 0 then
+        if y >= 0 then
+            return math.atan(y / x) + math.pi
+        else
+            return math.atan(y / x) - math.pi
+        end
+    else -- x == 0
+        if y > 0 then
+            return math.pi / 2
+        elseif y < 0 then
+            return -math.pi / 2
+        else
+            return 0 -- undefined mathematically, but standard atan2 usually returns 0
+        end
+    end
+end
+
 function _G.pprint(value, indent, visited)
     indent = indent or 0
     visited = visited or {}
@@ -59,6 +79,18 @@ function _G.bar()
 end
 
 -- useful functions
+function _G.with(canvas, shader, code, setup)
+    if setup ~= nil then setup() end
+
+    love.graphics.setCanvas(canvas)
+    love.graphics.setShader(shader)
+
+    if code ~= nil then code() end
+
+    love.graphics.setCanvas(nil)
+    love.graphics.setShader(nil)
+end
+
 function commons.round_to(x, step)
     return math.floor(x / step + 0.5) * step
 end
@@ -127,11 +159,9 @@ end
 function commons.split(str, sep)
     local result = {}
     local pattern = "([^" .. sep .. "]+)"
-    
     for match in string.gmatch(str, pattern) do
         table.insert(result, match)
     end
-    
     return result
 end
 
@@ -181,14 +211,6 @@ function commons.sum(tbl)
         total = total + value
     end
     return total
-end
-
-function commons.length(v)
-    local sum = 0
-    for i = 1, #v do
-        sum = sum + v[i] * v[i]
-    end
-    return math.sqrt(sum)
 end
 
 -- LLM

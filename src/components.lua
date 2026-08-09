@@ -8,10 +8,12 @@ comp.Inventory = {}
 comp.Inventory.__index = comp.Inventory
 comp.Inventory._name = "Inventory"
 
-function comp.Inventory:new(items)
+function comp.Inventory:new(items, amounts, render)
     return setmetatable({
         items = items,
-        index = 1
+        amounts = amounts,
+        index = 1,
+        render = render
     }, self)
 end
 
@@ -137,5 +139,18 @@ function comp.Hitbox:__tostring()
 end
 
 -------------------------------------------------
+
+comp.Timer = {}
+comp.Timer.__index = comp.Timer
+comp.Timer._name = "Timer"
+
+function comp.Timer:new(duration)
+    return setmetatable({
+        last = love.timer.getTime(),
+        duration = duration
+    }, self)
+end
+
+----------------------------------------------------
 
 return comp

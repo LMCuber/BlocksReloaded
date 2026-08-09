@@ -30,6 +30,9 @@ samurai:
     run:
         frames: 8
         offset: 0
+    jump:
+        frames: 1
+        offset: 0
 
 ra:
     idle:
@@ -48,3 +51,5 @@ _default:
         frames: 8
     _default_idle:
         frames: 4
+    _default_jump:
+        frames: 1
