@@ -7,6 +7,7 @@ local config = {
     rendering = true,
     blocks = true,
     vsync = true,
+    percent = false,
 }
 
 return config

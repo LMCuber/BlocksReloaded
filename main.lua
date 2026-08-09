@@ -30,22 +30,22 @@ ecs.create_entity(
     ),
     comp.Sprite:from_path("res/images/player_animations/dexter/run.png"),
     comp.Hitbox:new(52, 80),  -- static hitbox
-    comp.CameraAnchor:new(0.04),  -- camera follows its position
+    comp.CameraAnchor:new(0.1),  -- camera follows its position
     comp.Controllable:new(),  -- can move using keyboard,
-    comp.Inventory:new({"stone", "torch", "supertorch"})  -- inventory to place blocks
+    comp.Inventory:new({"torch", "torch", "supertorch"})  -- inventory to place blocks
 )
 
 local processed_chunks = {}
 
 local o = 0.17 * math.pi
 local model = Model:new({
-    obj_path = "res/models/bcc.obj",
+    obj_path = "res/models/caucasus.obj",
     center = Vec2:new(500, 300),
-    size = 140,
+    size = 30,
     light = {0, -1, 0},
     angle = Vec3:new(o, o, 0),
     avel = Vec3:new(0.0, 0.7, 0),
-    points = Color.NAVY,
+    -- points = Color.NAVY,
 })
 
 ---------------------------------------------------------------------
@@ -85,6 +85,10 @@ function love.update(dt)
     systems.editing.process(processed_chunks, world)
     systems.controllable.process(processed_chunks, world)
     systems.process_misc_update_systems(processed_chunks)
+
+    bench:start(Color.RED)
+    model:update()
+    bench:finish(Color.RED)
 
     -- shaders
     shaders.sky:send("time", love.timer.getTime())
@@ -135,6 +139,8 @@ function love.draw()
     -- EXIT: OFFSETTED RENDERING. EVERYHING FROM HERE WILL BE RENDERED ABSOLUTELY
     love.graphics.pop()
 
+    model:draw()
+
     -- BLITTING CANVAS ONTO MAIN WINDOW
     love.graphics.setCanvas()
     -- apply lighting shader beforehand
@@ -147,7 +153,7 @@ function love.draw()
     love.graphics.setShader()
 
     -- POST-CANVAS
-    bench:draw()
+    bench:draw(config.percent)
     systems.imgui.process({0, 0, 160, HEIGHT})
     love.graphics.setColor(Color.WHITE)
 end

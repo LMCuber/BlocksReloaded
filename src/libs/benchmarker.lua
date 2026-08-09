@@ -28,7 +28,9 @@ function Benchmarker:finish(key, p)
     end
 end
 
-function Benchmarker:draw()
+function Benchmarker:draw(percent)
+    local percent = percent or false
+
     local times
     local sum = 0
     local total_w = 0
@@ -54,8 +56,16 @@ function Benchmarker:draw()
         total_w = total_w + w
         love.graphics.setColor(Color.WHITE)
 
-        local mils = tonumber(string.format("%.1f", time * 1000))
-        love.graphics.print(mils, xo + total_w - w / 2 - 12, 46 - 24 * m)
+        local mils = time * 1000
+        local statistic = ""
+        if percent then
+            -- with respect to the total frame time
+            local mspf = 1 / love.timer.getFPS() * 1000  -- milliseconds per frame
+            statistic = string.format("%.0f%%", mils / mspf * 100)
+        else
+            statistic = string.format("%.1f", mils)
+        end
+        love.graphics.print(statistic, xo + total_w - w / 2 - 12, 46 - 24 * m)
 
         m = -m
     end
