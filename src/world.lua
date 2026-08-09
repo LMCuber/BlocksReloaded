@@ -600,7 +600,7 @@ function World:propagate_lighting(scroll)
 
     -- tx / ty is the absolute world position of the block
     -- rx / ry is the relative position within a chunk
-    -- iterate over y then go over all x
+    -- iterate over all y
     for ty = min_y, max_y do
         local y_offset = (ty - min_y) * map_w
         local cy = math.floor(ty / CH)
@@ -613,6 +613,7 @@ function World:propagate_lighting(scroll)
         local bg_col = bg_data[cx]
         local bg_chunk = bg_col and bg_col[cy]
 
+        -- iterate over all x
         for tx = min_x, max_x do
             local idx = y_offset + (tx - min_x) + 1
 
@@ -635,7 +636,7 @@ function World:propagate_lighting(scroll)
                 lightmap[idx] = 0
             end
 
-            -- advance rx/cx for the NEXT iteration, after using them this iteration
+            -- advance rx and cx for the NEXT iteration, AFTER using them this iteration
             rx = rx + 1
             if rx > CW then
                 rx = 1
