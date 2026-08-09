@@ -360,8 +360,8 @@ function systems.camera.process(chunks)
     for _, entry in ipairs(ecs.get_components(chunks, comp.CameraAnchor, comp.Transform)) do
         local _, _, _, cam, tr = commons.unpack(entry)
 
-        sg.fake_scroll.x = sg.fake_scroll.x + (tr.pos.x - sg.fake_scroll.x - WIDTH / 2 + 15) * cam.speed
-        sg.fake_scroll.y = sg.fake_scroll.y + (tr.pos.y - sg.fake_scroll.y - HEIGHT / 2 + 15) * cam.speed
+        sg.fake_scroll.x = sg.fake_scroll.x + (tr.pos.x - sg.fake_scroll.x - WIDTH / 2 + 15) * cam.speed * dt
+        sg.fake_scroll.y = sg.fake_scroll.y + (tr.pos.y - sg.fake_scroll.y - HEIGHT / 2 + 15) * cam.speed * dt
 
         sg.scroll.x = math.floor(sg.fake_scroll.x)
         sg.scroll.y = math.floor(sg.fake_scroll.y)

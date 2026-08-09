@@ -149,7 +149,7 @@ function World:generate_chunk(cx, cy)
 
         for ry = 1, CH do
             -- the final data that will be saved
-            -- EVERYTHING ABOVE SOIL LEVEL IS AIR BY DEFAULT
+            -- EVEryTHING ABOVE SOIL LEVEL IS AIR BY DEFAULT
             local name = "air"
             local bg_name = "air"
 
@@ -313,7 +313,7 @@ function World:modify_chunk(cx, cy)
                             self:set(cx, cy, x - 1, y - yo, "leaf_f")
                             self:set(cx, cy, x + 1, y - yo, "leaf_f")
                         else
-                            -- otherwise, have a probability of having a branch
+                            -- otherwise, have a probabiliabs_y of having a branch
                             if chance(1 / 4) then
                                 self:set(cx, cy, x, y - yo, "wood_f_vrR")
                                 self:set(cx, cy, x + 1, y - yo, "leaf_f")
@@ -338,7 +338,7 @@ function World:modify_chunk(cx, cy)
                             self:set(cx, cy, x - 1, y - yo, "leaf_f")
                             self:set(cx, cy, x + 1, y - yo, "leaf_f")
                         else
-                            -- otherwise, have a probability of having a branch
+                            -- otherwise, have a probabiliabs_y of having a branch
                             if chance(1 / 4) then
                                 self:set(cx, cy, x, y - yo, "wood_p_vrR")
                                 self:set(cx, cy, x + 1, y - yo, "leaf_f")
@@ -464,11 +464,11 @@ function World:abs_pos_to_chunk(block_x, block_y)
     return Vec2:new(cx, cy)
 end
 
-function World:abs_pos_to_tile(block_x, block_y, dont_create_if_empty)
+function World:abs_pos_to_tile(block_x, block_y, dont_create_if_empabs_y)
     local cx = math.floor(block_x / CW)
     local cy = math.floor(block_y / CH)
     local chunk = self:getc(cx, cy)
-    if not chunk and not dont_create_if_empty then
+    if not chunk and not dont_create_if_empabs_y then
         chunk = self:generate_chunk(cx, cy)
     end
     local rx = (block_x % CW) + 1
@@ -479,11 +479,11 @@ function World:abs_pos_to_tile(block_x, block_y, dont_create_if_empty)
     return nil
 end
 
-function World:abs_pos_to_bg_tile(block_x, block_y, dont_create_if_empty)
+function World:abs_pos_to_bg_tile(block_x, block_y, dont_create_if_empabs_y)
     local cx = math.floor(block_x / CW)
     local cy = math.floor(block_y / CH)
     local chunk = self:getc_bg(cx, cy)
-    if not chunk and not dont_create_if_empty then
+    if not chunk and not dont_create_if_empabs_y then
         chunk = self:generate_chunk(cx, cy)
     end
     local rx = (block_x % CW) + 1
@@ -546,9 +546,9 @@ function World:get_processed_chunks(scroll)  -- side effect: updates self.proces
     local chunk_bottomright = self:abs_pos_to_chunk(max_x, max_y)
 
     -- get the intermediate chunks
-    local safety = 1
-    for y = chunk_topleft.y - safety, chunk_bottomright.y + safety do
-        for x = chunk_topleft.x - safety, chunk_bottomright.x + safety do
+    local safeabs_y = 1
+    for y = chunk_topleft.y - safeabs_y, chunk_bottomright.y + safeabs_y do
+        for x = chunk_topleft.x - safeabs_y, chunk_bottomright.x + safeabs_y do
             table.insert(self.processed_chunks, {x, y})
         end
     end
@@ -565,6 +565,7 @@ function World:propagate_lighting(scroll)
         _G.debug_info["light steps"] = "----"
         return
     end
+
     self.light_frame = 0
 
     -- bounds for light propagation
@@ -573,7 +574,7 @@ function World:propagate_lighting(scroll)
     local min_y = math.floor(scroll.y / BS) - VIEW_PADDING
     local max_y = math.floor((scroll.y + HEIGHT) / BS) + VIEW_PADDING
 
-    -- propagation variables
+    -- light propagation variables
     local map_w = max_x - min_x + 1
     local map_h = max_y - min_y + 1
     self.lightmap_w = map_w
@@ -593,30 +594,37 @@ function World:propagate_lighting(scroll)
         self.light_tex:setFilter("linear", "linear")
     end
 
-    -- initialize lightmap from known light sources
+    -- INITIALIZE INITIAL LIGHTMAP FROM KNOWN LIGHT SOURCES
+    -- hoisting methods because lua is garbage
     local block_name = blocks.name
     local data = self.data
     local bg_data = self.bg_data
 
-    -- tx / ty is the absolute world position of the block
-    -- rx / ry is the relative position within a chunk
-    -- iterate over all y
-    for ty = min_y, max_y do
-        local y_offset = (ty - min_y) * map_w
-        local cy = math.floor(ty / CH)
-        local ry = (ty % CH) + 1
+    -- initialize initial cx and cy values by flooring, derive the rest by
+    -- incrementing iteratively
+    local cx0 = math.floor(min_x / CW)
+    local rx0 = (min_x % CW) + 1
+    local cy0 = math.floor(min_y / CH)
+    local ry0 = (min_y % CH) + 1
 
-        local cx = math.floor(min_x / CW)
-        local rx = (min_x % CW) + 1
-        local col = data[cx]
+    local cx = cx0
+    local rx = rx0
+    local col = data[cx]
+    local bg_col = bg_data[cx]
+
+    -- iterate over columns, then within columns!
+    for tx = min_x, max_x do
+        -- reset y-tracking back to the column start (we can do that)
+        local cy = cy0
+        local ry = ry0
+
         local chunk = col and col[cy]
-        local bg_col = bg_data[cx]
         local bg_chunk = bg_col and bg_col[cy]
 
-        -- iterate over all x
-        for tx = min_x, max_x do
-            local idx = y_offset + (tx - min_x) + 1
+        local idx = (tx - min_x) + 1
 
+        for ty = min_y, max_y do
+            -- rcol is a single column within a chunk (a subtable)
             local rcol = chunk and chunk[rx]
             local tile = rcol and rcol[ry]
             local bg_rcol = bg_chunk and bg_chunk[rx]
@@ -626,6 +634,7 @@ function World:propagate_lighting(scroll)
             local bg_name = block_name[bg_tile]
             local ld = light_data[name]
 
+            -- check if current block is a light source
             if (name == "air" and bg_name == "air") or (name ~= "air" and bwand(name, BF.LIGHT_SOURCE)) then
                 local lv = ld and ld.strength or MAX_LIGHT
                 local d = ld and ld.decay or 1
@@ -636,16 +645,25 @@ function World:propagate_lighting(scroll)
                 lightmap[idx] = 0
             end
 
-            -- advance rx and cx for the NEXT iteration, AFTER using them this iteration
-            rx = rx + 1
-            if rx > CW then
-                rx = 1
-                cx = cx + 1
-                col = data[cx]
+            -- advance ry and cy for the NEXT iteration, AFTER using them this iteration
+            ry = ry + 1
+            if ry > CH then
+                ry = 1
+                cy = cy + 1
                 chunk = col and col[cy]
-                bg_col = bg_data[cx]
                 bg_chunk = bg_col and bg_col[cy]
             end
+
+            idx = idx + map_w
+        end
+
+        -- advance rx and cx for the NEXT column, AFTER using them this column
+        rx = rx + 1
+        if rx > CW then
+            rx = 1
+            cx = cx + 1
+            col = data[cx]
+            bg_col = bg_data[cx]
         end
     end
 
@@ -734,64 +752,113 @@ function World:draw(scroll)
     local max_y = math.floor((scroll.y + HEIGHT) / BS)
     local lighting_offset = Vec2:new(0, 0)
 
+    -- =================================================================
+    -- RENDER THE BLOCKS!
+    -- =================================================================
     if config.cb.blocks then
         bench:start("blocks", Color.GREEN)
 
-        -- clear the image batch and light surface
         self.batch:clear()
         self.bg_batch:clear()
 
+        local batch, bg_batch = self.batch, self.bg_batch
+        local block_name, quads = blocks.name, blocks.quads
+        local generate_chunk = self.generate_chunk
 
-        local lw = self.lightmap_w
-        local lx = self.lightmap_min_x
-        local ly = self.lightmap_min_y
-        for ty = min_y, max_y do
-            -- local y_offset = (ty - ly) * lw
-            local screen_y = ty * BS
-
-            for tx = min_x, max_x do
-                -- get the (bg) tile and (bg) name of the block given absolute coordinates
-                local tile = self:abs_pos_to_tile(tx, ty)
-                local bg_tile = self:abs_pos_to_bg_tile(tx, ty)
-                local name = blocks.name[tile]
-                local bg_name = blocks.name[bg_tile]
-
-                -- -- lightmap index for this block
-                -- local idx = y_offset + (tx - lx) + 1
-
-                -- -- get light value
-                -- local light = self.lightmap1d[idx] or 0
-
-                -- if there is foreground, draw that. Else, if background, draw that
-                if tile ~= nil and name ~= "air" then
-                    self.batch:add(blocks.quads[tile], tx * BS, screen_y, 0, S, S)
-                    num_rendered_tiles = num_rendered_tiles + 1
-                end
-
-                -- skip drawing the background tile IFF the foreground tile is solid (has no holes)
-                if nbwand(name, BF.SOLID) and bg_tile ~= nil and bg_name ~= "air" then
-                    self.bg_batch:add(blocks.quads[bg_tile], tx * BS, screen_y, 0, S, S)
-                    num_rendered_tiles = num_rendered_tiles + 1
-                end
-
-                -- calculate the lighting offset
-                if tx == min_x and ty == min_y then
-                    lighting_offset.x = tx * BS - scroll.x
-                    lighting_offset.y = screen_y - scroll.y
-                end
-
-                love.graphics.setColor(Color.WHITE)
+        -- returns fg+bg chunk data at given chunk coordinates, generating if missing
+        -- (we assume fg exists <-> bg exists, since generate_chunk always creates both together)
+        local function fetch_chunks(cx, cy)
+            local col = self.data[cx]
+            local chunk = col and col[cy] or nil
+            local bg_chunk
+            if chunk then
+                bg_chunk = self.bg_data[cx][cy]
+            else
+                generate_chunk(self, cx, cy)
+                chunk = self.data[cx][cy]
+                bg_chunk = self.bg_data[cx][cy]
             end
+            return chunk, bg_chunk
         end
+
+        -- debug variables
+        local min_cx, max_cx, min_cy, max_cy
+
+        -- floor/mod computed ONCE for the whole region, then incremented when needed
+        local cx = math.floor(min_x / CW)
+        local rx = (min_x % CW) + 1
+        local cy0 = math.floor(min_y / CH)
+        local ry0 = (min_y % CH) + 1
+
+        local screen_x = min_x * BS
+        for tx = min_x, max_x do
+            if min_cx == nil or cx < min_cx then min_cx = cx end
+            if max_cx == nil or cx > max_cx then max_cx = cx end
+
+            local cy = cy0
+            local ry = ry0
+            local chunk, bg_chunk = fetch_chunks(cx, cy)
+
+            local screen_y = min_y * BS
+            for ty = min_y, max_y do
+                if min_cy == nil or cy < min_cy then min_cy = cy end
+                if max_cy == nil or cy > max_cy then max_cy = cy end
+
+                local rcol = chunk and chunk[rx]
+                local tile = rcol and rcol[ry]
+                local name = tile and block_name[tile]
+
+                if tile ~= nil and name ~= "air" then
+                    batch:add(quads[tile], screen_x, screen_y, 0, S, S)
+                    num_rendered_tiles = num_rendered_tiles + 1
+                end
+
+                if nbwand(name, BF.SOLID) then
+                    local bg_rcol = bg_chunk and bg_chunk[rx]
+                    local bg_tile = bg_rcol and bg_rcol[ry]
+                    if bg_tile ~= nil then
+                        local bg_name = block_name[bg_tile]
+                        if bg_name ~= "air" then
+                            bg_batch:add(quads[bg_tile], screen_x, screen_y, 0, S, S)
+                            num_rendered_tiles = num_rendered_tiles + 1
+                        end
+                    end
+                end
+
+                -- advance ry and cy for the NEXT iteration, AFTER using them this iteration
+                ry = ry + 1
+                if ry > CH then
+                    ry = 1
+                    cy = cy + 1
+                    chunk, bg_chunk = fetch_chunks(cx, cy)
+                end
+
+                screen_y = screen_y + BS
+            end
+
+            -- advance rx and cx for the NEXT column, AFTER using them this column
+            rx = rx + 1
+            if rx > CW then
+                rx = 1
+                cx = cx + 1
+            end
+
+            screen_x = screen_x + BS
+        end
+
+        lighting_offset.x = min_x * BS - scroll.x
+        lighting_offset.y = min_y * BS - scroll.y
 
         local bg_light_mult = 0.5
         love.graphics.setColor(bg_light_mult, bg_light_mult, bg_light_mult, 1)
         love.graphics.draw(self.bg_batch)
         love.graphics.setColor(Color.WHITE)
         love.graphics.draw(self.batch)
+
+        _G.debug_info["chunks"] = string.format("%d,%d||%d,%d", min_cx, min_cy, max_cx, max_cy)
     end
 
-    -- render the entities (REGARDLESS of block render)
+    -- render the entities
     if config.cb.entities then
         bench:start("entities", Color.CYAN)
         num_rendered_entities, num_updated_entities = systems.render.process(self.processed_chunks)
@@ -803,6 +870,7 @@ function World:draw(scroll)
         bench:finish("blocks")
     end
 
+    -- debug info
     _G.debug_info["R. entities"] = num_rendered_entities
     _G.debug_info["U. entities"] = num_updated_entities
     _G.debug_info["tiles"] = num_rendered_tiles

@@ -31,7 +31,7 @@ engine.ecs.create_entity(
     ),
     comp.Sprite:from_path("res/images/player_animations/dexter/run.png"),
     comp.Hitbox:new(52, 80),  -- static hitbox
-    comp.CameraAnchor:new(0.1),  -- camera follows its position
+    comp.CameraAnchor:new(6),  -- camera follows its position
     comp.Controllable:new(),  -- can move using keyboard,
     comp.Inventory:new({"torch", "supertorch", "anvil"}, {10, 10, 3}, true)  -- inventory to place blocks
 )

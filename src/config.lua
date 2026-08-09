@@ -1,5 +1,5 @@
 local config = {
-    cb = {
+    cb = {  -- CheckBoxes
         hitboxes = false,
         borders = false,
         palette = true,
@@ -10,7 +10,7 @@ local config = {
         vsync = true,
         chiaroscuro = true,
     },
-    cm = {
+    cm = {  -- CoMboboxes
         palette_index = 1,
     },
 }
