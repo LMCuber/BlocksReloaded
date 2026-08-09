@@ -600,6 +600,7 @@ function World:propagate_lighting(scroll)
 
     -- tx / ty is the absolute world position of the block
     -- rx / ry is the relative position within a chunk
+    -- iterate over y then go over all x
     for ty = min_y, max_y do
         local y_offset = (ty - min_y) * map_w
         local cy = math.floor(ty / CH)
