@@ -598,6 +598,8 @@ function World:propagate_lighting(scroll)
     local data = self.data
     local bg_data = self.bg_data
 
+    -- tx / ty is the absolute world position of the block
+    -- rx / ry is the relative position within a chunk
     for ty = min_y, max_y do
         local y_offset = (ty - min_y) * map_w
         local cy = math.floor(ty / CH)
@@ -633,6 +635,7 @@ function World:propagate_lighting(scroll)
                 lightmap[idx] = 0
             end
 
+            -- check if the relative x is out of bounds for the chunk. If so, correct it
             tx = tx + 1
             rx = rx + 1
             if rx > CW then
