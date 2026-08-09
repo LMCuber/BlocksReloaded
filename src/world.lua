@@ -606,15 +606,14 @@ function World:propagate_lighting(scroll)
         local cy = math.floor(ty / CH)
         local ry = (ty % CH) + 1
 
-        local tx = min_x
-        local cx = math.floor(tx / CW)
-        local rx = (tx % CW) + 1
+        local cx = math.floor(min_x / CW)
+        local rx = (min_x % CW) + 1
         local col = data[cx]
         local chunk = col and col[cy]
         local bg_col = bg_data[cx]
         local bg_chunk = bg_col and bg_col[cy]
 
-        while tx <= max_x do
+        for tx = min_x, max_x do
             local idx = y_offset + (tx - min_x) + 1
 
             local rcol = chunk and chunk[rx]
@@ -636,8 +635,7 @@ function World:propagate_lighting(scroll)
                 lightmap[idx] = 0
             end
 
-            -- check if the relative x is out of bounds for the chunk. If so, correct it
-            tx = tx + 1
+            -- advance rx/cx for the NEXT iteration, after using them this iteration
             rx = rx + 1
             if rx > CW then
                 rx = 1
